@@ -53,6 +53,36 @@ String _invoiceQty(Product? product, int quantity) {
   return '$quantity units';
 }
 
+String _formatInvoiceDgdaFieldLabel(String rawKey) {
+  final withSpaces = rawKey.replaceAll('_', ' ').trim();
+  if (withSpaces.isEmpty) {
+    return withSpaces;
+  }
+
+  final words = withSpaces.split(RegExp(r'\s+'));
+  return words
+      .map((word) {
+        if (word.isEmpty) {
+          return word;
+        }
+        return '${word[0].toUpperCase()}${word.substring(1)}';
+      })
+      .join(' ');
+}
+
+String _cleanInvoiceDgdaFieldValue(String value) {
+  var cleaned = value;
+  cleaned = cleaned.replaceAll(RegExp(r'<[^>]*>'), ' ');
+  cleaned = cleaned.replaceAll('&nbsp;', ' ');
+  cleaned = cleaned.replaceAll('&amp;', '&');
+  cleaned = cleaned.replaceAll('&quot;', '"');
+  cleaned = cleaned.replaceAll('&#39;', "'");
+  cleaned = cleaned.replaceAll('&lt;', '<');
+  cleaned = cleaned.replaceAll('&gt;', '>');
+  cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
+  return cleaned;
+}
+
 class InvoiceListPage extends ConsumerWidget {
   const InvoiceListPage({super.key});
 
@@ -148,6 +178,58 @@ class _InvoiceDetailsPageState extends ConsumerState<InvoiceDetailsPage> {
           .getInvoiceDetails(widget.invoiceId);
     });
     await _detailsFuture;
+  }
+
+  Future<void> _showDgdaDataDialog({
+    required String title,
+    required Map<String, String> data,
+  }) async {
+    final entries = data.entries
+        .map(
+          (entry) => MapEntry(
+            _formatInvoiceDgdaFieldLabel(entry.key),
+            _cleanInvoiceDgdaFieldValue(entry.value),
+          ),
+        )
+        .where((entry) => entry.value.isNotEmpty)
+        .toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(title),
+          content: SizedBox(
+            width: 760,
+            height: 560,
+            child: entries.isEmpty
+                ? const Center(child: Text('No DGDA metadata found.'))
+                : ListView.separated(
+                    itemCount: entries.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final entry = entries[index];
+                      return ListTile(
+                        dense: true,
+                        title: Text(
+                          entry.key,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(entry.value),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _showPaymentDialog(InvoiceDetails details) async {
@@ -469,28 +551,67 @@ class _InvoiceDetailsPageState extends ConsumerState<InvoiceDetailsPage> {
               const SizedBox(height: 8),
               ...details.items.map((item) {
                 final product = productsById[item.productId];
+                final hasDgdaData = product?.hasDgdaData ?? false;
+                final dgdaSummary = <String>[
+                  if ((product?.dgdaGenericName ?? '').trim().isNotEmpty)
+                    'Generic: ${product?.dgdaGenericName}',
+                  if ((product?.dgdaDosageForm ?? '').trim().isNotEmpty)
+                    'Form: ${product?.dgdaDosageForm}',
+                  if ((product?.dgdaStrength ?? '').trim().isNotEmpty)
+                    'Strength: ${product?.dgdaStrength}',
+                  if ((product?.dgdaManufacturer ?? '').trim().isNotEmpty)
+                    'Manufacturer: ${product?.dgdaManufacturer}',
+                ];
+
+                final subtitleBuffer = StringBuffer(
+                  '${_invoiceQty(product, item.quantity)} • ${_invoiceMoney(item.unitPrice)} each',
+                );
+                if (dgdaSummary.isNotEmpty) {
+                  subtitleBuffer.write('\n${dgdaSummary.join(' • ')}');
+                }
+
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Card(
-                    child: ListTile(
-                      title: Text(item.productName),
-                      subtitle: Text(
-                        '${_invoiceQty(product, item.quantity)} • ${_invoiceMoney(item.unitPrice)} each',
-                      ),
-                      trailing: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            _invoiceMoney(item.total),
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                    child: Column(
+                      children: [
+                        ListTile(
+                          title: Text(item.productName),
+                          subtitle: Text(subtitleBuffer.toString()),
+                          isThreeLine: dgdaSummary.isNotEmpty,
+                          trailing: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                _invoiceMoney(item.total),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                'Profit ${_invoiceMoney(item.profit)}',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
                           ),
-                          Text(
-                            'Profit ${_invoiceMoney(item.profit)}',
-                            style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        if (hasDgdaData)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: OutlinedButton.icon(
+                                onPressed: () => _showDgdaDataDialog(
+                                  title: item.productName,
+                                  data: product!.dgdaData,
+                                ),
+                                icon: const Icon(Icons.medication_outlined),
+                                label: const Text('View full DGDA details'),
+                              ),
+                            ),
                           ),
-                        ],
-                      ),
+                      ],
                     ),
                   ),
                 );
@@ -579,7 +700,9 @@ class _InvoiceDetailsPageState extends ConsumerState<InvoiceDetailsPage> {
 }
 
 class CustomerListPage extends ConsumerStatefulWidget {
-  const CustomerListPage({super.key});
+  const CustomerListPage({super.key, this.showScaffold = true});
+
+  final bool showScaffold;
 
   @override
   ConsumerState<CustomerListPage> createState() => _CustomerListPageState();
@@ -608,103 +731,102 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
           (customer.phone ?? '').toLowerCase().contains(normalizedQuery);
     }).toList();
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Customers')),
-      body: controller.customers.isEmpty
-          ? const Center(child: Text('No customer profiles yet.'))
-          : Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: (value) {
-                      setState(() {
-                        _query = value;
-                      });
-                    },
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.search),
-                      labelText: 'Search customer by name or phone',
-                      suffixIcon: _query.trim().isEmpty
-                          ? null
-                          : IconButton(
-                              tooltip: 'Clear',
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() {
-                                  _query = '';
-                                });
-                              },
-                              icon: const Icon(Icons.close),
-                            ),
-                    ),
+    final content = controller.customers.isEmpty
+        ? const Center(child: Text('No customer profiles yet.'))
+        : Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (value) {
+                    setState(() {
+                      _query = value;
+                    });
+                  },
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.search),
+                    labelText: 'Search customer by name or phone',
+                    suffixIcon: _query.trim().isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Clear',
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {
+                                _query = '';
+                              });
+                            },
+                            icon: const Icon(Icons.close),
+                          ),
                   ),
                 ),
-                Expanded(
-                  child: filteredCustomers.isEmpty
-                      ? const Center(child: Text('No matching customer found.'))
-                      : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                          itemCount: filteredCustomers.length,
-                          separatorBuilder: (_, _) => const SizedBox(height: 8),
-                          itemBuilder: (context, index) {
-                            final customer = filteredCustomers[index];
-                            final summary = controller
-                                .customerDueSummaries[customer.id ?? ''];
-                            final invoiceCount = summary?.invoiceCount ?? 0;
-                            final totalDue = summary?.totalDue ?? 0;
-                            final totalPaid = summary?.totalPaid ?? 0;
-                            final avatarLabel = customer.name.isEmpty
-                                ? '?'
-                                : customer.name.substring(0, 1).toUpperCase();
+              ),
+              Expanded(
+                child: filteredCustomers.isEmpty
+                    ? const Center(child: Text('No matching customer found.'))
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                        itemCount: filteredCustomers.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
+                        itemBuilder: (context, index) {
+                          final customer = filteredCustomers[index];
+                          final summary =
+                              controller.customerDueSummaries[customer.id ?? ''];
+                          final invoiceCount = summary?.invoiceCount ?? 0;
+                          final totalDue = summary?.totalDue ?? 0;
+                          final totalPaid = summary?.totalPaid ?? 0;
+                          final avatarLabel = customer.name.isEmpty
+                              ? '?'
+                              : customer.name.substring(0, 1).toUpperCase();
 
-                            return Card(
-                              child: ListTile(
-                                leading: CircleAvatar(child: Text(avatarLabel)),
-                                title: Text(customer.name),
-                                subtitle: Text(
-                                  '${customer.phone ?? 'No phone'} • $invoiceCount invoice${invoiceCount == 1 ? '' : 's'}',
-                                ),
-                                trailing: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      'Due ${_invoiceMoney(totalDue)}',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        color: totalDue > 0
-                                            ? Theme.of(
-                                                context,
-                                              ).colorScheme.error
-                                            : Theme.of(
-                                                context,
-                                              ).colorScheme.primary,
-                                      ),
-                                    ),
-                                    Text(
-                                      'Paid ${_invoiceMoney(totalPaid)}',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall,
-                                    ),
-                                  ],
-                                ),
-                                onTap: () {
-                                  Navigator.of(context).pushNamed(
-                                    AppRoutes.customerShow,
-                                    arguments: customer.id,
-                                  );
-                                },
+                          return Card(
+                            child: ListTile(
+                              leading: CircleAvatar(child: Text(avatarLabel)),
+                              title: Text(customer.name),
+                              subtitle: Text(
+                                '${customer.phone ?? 'No phone'} • $invoiceCount invoice${invoiceCount == 1 ? '' : 's'}',
                               ),
-                            );
-                          },
-                        ),
-                ),
-              ],
-            ),
-    );
+                              trailing: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    'Due ${_invoiceMoney(totalDue)}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: totalDue > 0
+                                          ? Theme.of(context).colorScheme.error
+                                          : Theme.of(context)
+                                                .colorScheme
+                                                .primary,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Paid ${_invoiceMoney(totalPaid)}',
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ],
+                              ),
+                              onTap: () {
+                                Navigator.of(context).pushNamed(
+                                  AppRoutes.customerShow,
+                                  arguments: customer.id,
+                                );
+                              },
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          );
+
+    if (!widget.showScaffold) {
+      return content;
+    }
+
+    return Scaffold(appBar: AppBar(title: const Text('Customers')), body: content);
   }
 }
 

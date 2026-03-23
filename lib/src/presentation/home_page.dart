@@ -7,6 +7,7 @@ import '../app.dart';
 import '../domain/models.dart';
 import 'app_controller.dart';
 import 'app_routes.dart';
+import 'invoice_pages.dart';
 
 const int _lowStockThreshold = 10;
 const int _criticalStockThreshold = 3;
@@ -85,6 +86,113 @@ String _deltaQuantityDisplay(Product? product, int deltaQuantity) {
   return '$sign$absolute units';
 }
 
+double? _extractDgdaPrice(DgdaMedicine medicine) {
+  final texts = <String>{
+    medicine.packageContainer,
+    medicine.packageSize,
+    medicine.allData['medicine_package_container'] ?? '',
+    medicine.allData['medicine_package_size'] ?? '',
+  };
+
+  final unitPattern = RegExp(
+    r'unit\s*price\s*:\s*৳\s*([0-9]+(?:\.[0-9]+)?)',
+    caseSensitive: false,
+  );
+  final currencyPattern = RegExp(r'৳\s*([0-9]+(?:\.[0-9]+)?)');
+
+  for (final text in texts) {
+    final normalized = text.trim();
+    if (normalized.isEmpty) {
+      continue;
+    }
+
+    final unitMatch = unitPattern.firstMatch(normalized);
+    if (unitMatch != null) {
+      final parsed = double.tryParse(unitMatch.group(1) ?? '');
+      if (parsed != null && parsed > 0) {
+        return parsed;
+      }
+    }
+  }
+
+  for (final text in texts) {
+    final normalized = text.trim();
+    if (normalized.isEmpty) {
+      continue;
+    }
+
+    final currencyMatch = currencyPattern.firstMatch(normalized);
+    if (currencyMatch != null) {
+      final parsed = double.tryParse(currencyMatch.group(1) ?? '');
+      if (parsed != null && parsed > 0) {
+        return parsed;
+      }
+    }
+  }
+
+  return null;
+}
+
+int? _extractDgdaUnitsPerPack(DgdaMedicine medicine) {
+  final texts = <String>{
+    medicine.packageContainer,
+    medicine.packageSize,
+    medicine.allData['medicine_package_container'] ?? '',
+    medicine.allData['medicine_package_size'] ?? '',
+  };
+
+  final packPattern = RegExp(r"\(?\s*(\d+)\s*'s\s*pack", caseSensitive: false);
+
+  for (final text in texts) {
+    final normalized = text.trim();
+    if (normalized.isEmpty) {
+      continue;
+    }
+
+    final match = packPattern.firstMatch(normalized);
+    if (match == null) {
+      continue;
+    }
+
+    final parsed = int.tryParse(match.group(1) ?? '');
+    if (parsed != null && parsed > 0) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+String _formatDgdaFieldLabel(String rawKey) {
+  final withSpaces = rawKey.replaceAll('_', ' ').trim();
+  if (withSpaces.isEmpty) {
+    return withSpaces;
+  }
+
+  final words = withSpaces.split(RegExp(r'\s+'));
+  return words
+      .map((word) {
+        if (word.isEmpty) {
+          return word;
+        }
+        return '${word[0].toUpperCase()}${word.substring(1)}';
+      })
+      .join(' ');
+}
+
+String _cleanDgdaFieldValue(String value) {
+  var cleaned = value;
+  cleaned = cleaned.replaceAll(RegExp(r'<[^>]*>'), ' ');
+  cleaned = cleaned.replaceAll('&nbsp;', ' ');
+  cleaned = cleaned.replaceAll('&amp;', '&');
+  cleaned = cleaned.replaceAll('&quot;', '"');
+  cleaned = cleaned.replaceAll('&#39;', "'");
+  cleaned = cleaned.replaceAll('&lt;', '<');
+  cleaned = cleaned.replaceAll('&gt;', '>');
+  cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
+  return cleaned;
+}
+
 class _SellCartItem {
   _SellCartItem({
     required this.product,
@@ -111,6 +219,30 @@ class PharmacyHomePage extends ConsumerStatefulWidget {
 class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
   int _selectedTab = 0;
   bool _focusMode = false;
+
+  String get _activeTabTitle {
+    return switch (_selectedTab) {
+      0 => 'Jarin Pharmacy',
+      1 => 'Sell',
+      2 => 'Stock',
+      3 => 'bKash',
+      4 => 'Reports',
+      5 => 'Customers',
+      _ => 'Jarin Pharmacy',
+    };
+  }
+
+  String get _activeTabSubtitle {
+    return switch (_selectedTab) {
+      0 => 'Offline Smart POS',
+      1 => 'Create and manage bills',
+      2 => 'Products and inventory records',
+      3 => 'Wallet transactions',
+      4 => 'Business performance overview',
+      5 => 'Customer profiles and dues',
+      _ => 'Offline Smart POS',
+    };
+  }
 
   @override
   void initState() {
@@ -141,6 +273,7 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
       _InventoryTab(controller: controller, focusMode: _focusMode),
       _BkashTab(controller: controller),
       _ReportsTab(controller: controller, onPickDate: _pickReportDate),
+      const CustomerListPage(showScaffold: false),
     ];
 
     return Scaffold(
@@ -149,10 +282,10 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
         title: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Jarin Pharmacy'),
+            Text(_activeTabTitle),
             if (!_focusMode)
               Text(
-                'Offline Smart POS',
+                _activeTabSubtitle,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w500,
@@ -299,10 +432,6 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
               : null,
           selectedIndex: _selectedTab,
           onDestinationSelected: (index) {
-            if (index == 5) {
-              Navigator.of(context).pushReplacementNamed(AppRoutes.customers);
-              return;
-            }
             if (index == _selectedTab) {
               return;
             }
@@ -972,6 +1101,58 @@ class _SellTabState extends State<_SellTab> {
     });
   }
 
+  Future<void> _showDgdaDataDialog({
+    required String title,
+    required Map<String, String> data,
+  }) async {
+    final entries = data.entries
+        .map(
+          (entry) => MapEntry(
+            _formatDgdaFieldLabel(entry.key),
+            _cleanDgdaFieldValue(entry.value),
+          ),
+        )
+        .where((entry) => entry.value.isNotEmpty)
+        .toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(title),
+          content: SizedBox(
+            width: 760,
+            height: 560,
+            child: entries.isEmpty
+                ? const Center(child: Text('No DGDA metadata found.'))
+                : ListView.separated(
+                    itemCount: entries.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final entry = entries[index];
+                      return ListTile(
+                        dense: true,
+                        title: Text(
+                          entry.key,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(entry.value),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _recordSaleCart() async {
     if (_cart.isEmpty) {
       return;
@@ -1267,6 +1448,7 @@ class _SellTabState extends State<_SellTab> {
               itemCount: filteredProducts.length,
               itemBuilder: (context, index) {
                 final product = filteredProducts[index];
+                final hasDgdaData = product.hasDgdaData;
                 final supportsPiecePack =
                     product.trackInPieces && product.unitsPerPack > 1;
                 final inCart = _cart.where(
@@ -1287,7 +1469,34 @@ class _SellTabState extends State<_SellTab> {
                       return KeyEventResult.ignored;
                     },
                     child: ListTile(
-                      title: Text(product.name),
+                      title: Row(
+                        children: [
+                          Expanded(child: Text(product.name)),
+                          if (hasDgdaData)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                'DGDA',
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onPrimaryContainer,
+                                    ),
+                              ),
+                            ),
+                        ],
+                      ),
                       subtitle: Text(
                         '${_categoryLabel(product.category)} • ${_money(product.sellPrice)} • Stock ${_stockDisplay(product)}',
                       ),
@@ -1319,10 +1528,8 @@ class _SellTabState extends State<_SellTab> {
                               ],
                             )
                           : FilledButton.icon(
-                              onPressed: () => _addProductToCart(
-                                product,
-                                quantityToAdd: 1,
-                              ),
+                              onPressed: () =>
+                                  _addProductToCart(product, quantityToAdd: 1),
                               icon: const Icon(Icons.add),
                               label: Text(
                                 quantityInCart == 0
@@ -1363,11 +1570,33 @@ class _SellTabState extends State<_SellTab> {
                         final supportsPiecePack =
                             item.product.trackInPieces &&
                             item.product.unitsPerPack > 1;
+                        final hasDgdaData = item.product.hasDgdaData;
+                        final dgdaSummary = <String>[
+                          if ((item.product.dgdaGenericName ?? '')
+                              .trim()
+                              .isNotEmpty)
+                            'Generic: ${item.product.dgdaGenericName}',
+                          if ((item.product.dgdaDosageForm ?? '')
+                              .trim()
+                              .isNotEmpty)
+                            'Form: ${item.product.dgdaDosageForm}',
+                          if ((item.product.dgdaStrength ?? '')
+                              .trim()
+                              .isNotEmpty)
+                            'Strength: ${item.product.dgdaStrength}',
+                        ];
+
+                        final subtitleBuffer = StringBuffer(
+                          '${supportsPiecePack ? _cartQuantityLabel(item.product, item.quantity) : item.quantity} x ${_money(item.unitPrice)} = ${_money(item.total)}',
+                        );
+                        if (dgdaSummary.isNotEmpty) {
+                          subtitleBuffer.write('\n${dgdaSummary.join(' • ')}');
+                        }
+
                         return ListTile(
                           title: Text(item.product.name),
-                          subtitle: Text(
-                            '${supportsPiecePack ? _cartQuantityLabel(item.product, item.quantity) : item.quantity} x ${_money(item.unitPrice)} = ${_money(item.total)}',
-                          ),
+                          subtitle: Text(subtitleBuffer.toString()),
+                          isThreeLine: dgdaSummary.isNotEmpty,
                           leading: _QuantityStepper(
                             quantity: item.quantity,
                             onDecrease: () => _changeCartQuantity(index, -1),
@@ -1391,9 +1620,7 @@ class _SellTabState extends State<_SellTab> {
                                           content: Text(
                                             '${item.product.name} removed from bill.',
                                           ),
-                                          duration: const Duration(
-                                            seconds: 1,
-                                          ),
+                                          duration: const Duration(seconds: 1),
                                         ),
                                       );
                                     }
@@ -1406,7 +1633,8 @@ class _SellTabState extends State<_SellTab> {
                               if (supportsPiecePack)
                                 IconButton(
                                   onPressed:
-                                      item.quantity + item.product.unitsPerPack <=
+                                      item.quantity +
+                                              item.product.unitsPerPack <=
                                           item.product.stockQty
                                       ? () => _changeCartQuantity(
                                           index,
@@ -1416,41 +1644,48 @@ class _SellTabState extends State<_SellTab> {
                                   tooltip: 'Pack +',
                                   icon: const Icon(Icons.add_box_outlined),
                                 ),
+                              if (hasDgdaData)
+                                IconButton(
+                                  onPressed: () => _showDgdaDataDialog(
+                                    title: item.product.name,
+                                    data: item.product.dgdaData,
+                                  ),
+                                  tooltip: 'DGDA details',
+                                  icon: const Icon(Icons.info_outline),
+                                ),
                               PopupMenuButton<String>(
-                                  onSelected: (value) {
-                                    if (value == 'price') {
-                                      _editCartPrice(index);
-                                    }
-                                    if (value == 'remove') {
-                                      setState(() {
-                                        _cart.removeAt(index);
-                                      });
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              '${item.product.name} removed from bill.',
-                                            ),
-                                            duration: const Duration(
-                                              seconds: 1,
-                                            ),
+                                onSelected: (value) {
+                                  if (value == 'price') {
+                                    _editCartPrice(index);
+                                  }
+                                  if (value == 'remove') {
+                                    setState(() {
+                                      _cart.removeAt(index);
+                                    });
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            '${item.product.name} removed from bill.',
                                           ),
-                                        );
-                                      }
+                                          duration: const Duration(seconds: 1),
+                                        ),
+                                      );
                                     }
-                                  },
-                                  itemBuilder: (context) => const [
-                                    PopupMenuItem(
-                                      value: 'price',
-                                      child: Text('Edit Price'),
-                                    ),
-                                    PopupMenuItem(
-                                      value: 'remove',
-                                      child: Text('Remove'),
-                                    ),
-                                  ],
+                                  }
+                                },
+                                itemBuilder: (context) => const [
+                                  PopupMenuItem(
+                                    value: 'price',
+                                    child: Text('Edit Price'),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'remove',
+                                    child: Text('Remove'),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -1702,10 +1937,179 @@ class _InventoryTabState extends State<_InventoryTab> {
   }
 
   List<Product> get _filteredProducts {
+    final normalizedQuery = _query.trim().toLowerCase();
+
     return widget.controller.products.where((product) {
-      return _query.isEmpty ||
-          product.name.toLowerCase().contains(_query.toLowerCase());
+      if (normalizedQuery.isEmpty) {
+        return true;
+      }
+
+      if (product.name.toLowerCase().contains(normalizedQuery) ||
+          (product.dgdaGenericName ?? '').toLowerCase().contains(
+            normalizedQuery,
+          ) ||
+          (product.dgdaManufacturer ?? '').toLowerCase().contains(
+            normalizedQuery,
+          ) ||
+          (product.dgdaStrength ?? '').toLowerCase().contains(normalizedQuery) ||
+          (product.dgdaDosageForm ?? '').toLowerCase().contains(
+            normalizedQuery,
+          )) {
+        return true;
+      }
+
+      for (final value in product.dgdaData.values) {
+        if (value.toLowerCase().contains(normalizedQuery)) {
+          return true;
+        }
+      }
+
+      return false;
     }).toList();
+  }
+
+  Future<void> _showDgdaDataDialog({
+    required String title,
+    required Map<String, String> data,
+  }) async {
+    final entries = data.entries
+        .map(
+          (entry) => MapEntry(
+            _formatDgdaFieldLabel(entry.key),
+            _cleanDgdaFieldValue(entry.value),
+          ),
+        )
+        .where((entry) => entry.value.isNotEmpty)
+        .toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(title),
+          content: SizedBox(
+            width: 760,
+            height: 560,
+            child: entries.isEmpty
+                ? const Center(child: Text('No DGDA metadata available.'))
+                : ListView.separated(
+                    itemCount: entries.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final entry = entries[index];
+                      return ListTile(
+                        dense: true,
+                        title: Text(
+                          entry.key,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(entry.value),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<DgdaMedicine?> _showDgdaMedicinePicker() async {
+    final searchController = TextEditingController();
+    var query = '';
+
+    return showDialog<DgdaMedicine>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            final medicines = widget.controller.searchDgdaMedicines(
+              query,
+              limit: 80,
+            );
+
+            return AlertDialog(
+              title: const Text('Select DGDA Medicine'),
+              content: SizedBox(
+                width: 720,
+                height: 520,
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: searchController,
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.search),
+                        labelText: 'Search by brand, generic, strength, DAR',
+                      ),
+                      onChanged: (value) {
+                        setStateDialog(() {
+                          query = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: query.trim().isEmpty
+                          ? const Center(
+                              child: Text('Type to search DGDA dataset.'),
+                            )
+                          : medicines.isEmpty
+                          ? const Center(
+                              child: Text('No DGDA medicine matched.'),
+                            )
+                          : ListView.separated(
+                              itemCount: medicines.length,
+                              separatorBuilder: (_, _) =>
+                                  const Divider(height: 1),
+                              itemBuilder: (context, index) {
+                                final medicine = medicines[index];
+                                final subtitleParts = <String>[
+                                  if (medicine.type.isNotEmpty) medicine.type,
+                                  if (medicine.genericName.isNotEmpty)
+                                    medicine.genericName,
+                                  if (medicine.manufacturer.isNotEmpty)
+                                    medicine.manufacturer,
+                                  if (medicine.packageContainer.isNotEmpty)
+                                    medicine.packageContainer,
+                                  if (medicine.darNumber.isNotEmpty)
+                                    'DAR ${medicine.darNumber}',
+                                ];
+
+                                return ListTile(
+                                  dense: true,
+                                  title: Text(medicine.displayName),
+                                  subtitle: subtitleParts.isEmpty
+                                      ? null
+                                      : Text(subtitleParts.join(' • ')),
+                                  onTap: () => Navigator.pop(
+                                    dialogContext,
+                                    medicine,
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancel'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _showStockInDialog(Product product) async {
@@ -1880,6 +2284,25 @@ class _InventoryTabState extends State<_InventoryTab> {
       text: product == null ? '1' : product.unitsPerPack.toString(),
     );
     var selectedCategory = product?.category ?? ProductCategory.medicine;
+    DgdaMedicine? selectedDgdaMedicine = product == null
+        ? null
+        : DgdaMedicine(
+            brandId: product.dgdaBrandId ?? '',
+            brandName: product.name,
+            type: product.dgdaType ?? '',
+            slug: product.dgdaSlug ?? '',
+            genericName: product.dgdaGenericName ?? '',
+            strength: product.dgdaStrength ?? '',
+            dosageForm: product.dgdaDosageForm ?? '',
+            manufacturer: product.dgdaManufacturer ?? '',
+            darNumber: product.dgdaData['medicine_dar_number'] ?? '',
+            packageContainer: product.dgdaPackageContainer ?? '',
+            packageSize: product.dgdaPackageSize ?? '',
+            drugClass: product.dgdaData['generic_drug_class'] ?? '',
+            indication: product.dgdaData['generic_indication'] ?? '',
+            monographLink: product.dgdaData['generic_monograph_link'] ?? '',
+            allData: product.dgdaData,
+          );
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1897,6 +2320,96 @@ class _InventoryTabState extends State<_InventoryTab> {
                       autofocus: true,
                       decoration: const InputDecoration(labelText: 'Name'),
                     ),
+                    if (selectedCategory == ProductCategory.medicine) ...[
+                      const SizedBox(height: 8),
+                      if (widget.controller.hasDgdaDataset)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final picked = await _showDgdaMedicinePicker();
+                              if (picked == null) {
+                                return;
+                              }
+
+                              final parsedPrice = _extractDgdaPrice(picked);
+                              final parsedUnitsPerPack =
+                                  _extractDgdaUnitsPerPack(picked);
+
+                              setStateDialog(() {
+                                selectedDgdaMedicine = picked;
+                                nameController.text = picked.displayName;
+                                if (parsedPrice != null) {
+                                  buyController.text = parsedPrice
+                                      .toStringAsFixed(2);
+                                  sellController.text = parsedPrice
+                                      .toStringAsFixed(2);
+                                }
+                                if (parsedUnitsPerPack != null) {
+                                  unitsPerPackController.text =
+                                      parsedUnitsPerPack.toString();
+                                }
+                              });
+                            },
+                            icon: const Icon(Icons.medication_outlined),
+                            label: Text(
+                              selectedDgdaMedicine == null
+                                  ? 'Pick from DGDA dataset'
+                                  : 'Change DGDA medicine',
+                            ),
+                          ),
+                        )
+                      else
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'DGDA dataset not loaded. Add CSV to assets/data/dgda_medicines.csv',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
+                      if (selectedDgdaMedicine != null) ...[
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            [
+                              if (selectedDgdaMedicine!.genericName.isNotEmpty)
+                                selectedDgdaMedicine!.genericName,
+                              if (selectedDgdaMedicine!.manufacturer.isNotEmpty)
+                                selectedDgdaMedicine!.manufacturer,
+                              if (selectedDgdaMedicine!.drugClass.isNotEmpty)
+                                selectedDgdaMedicine!.drugClass,
+                              if (selectedDgdaMedicine!.darNumber.isNotEmpty)
+                                'DAR ${selectedDgdaMedicine!.darNumber}',
+                            ].join(' • '),
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: () => _showDgdaDataDialog(
+                                title: selectedDgdaMedicine!.displayName,
+                                data: selectedDgdaMedicine!.allData,
+                              ),
+                              icon: const Icon(Icons.info_outline),
+                              label: const Text('View full DGDA details'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                setStateDialog(() {
+                                  selectedDgdaMedicine = null;
+                                });
+                              },
+                              child: const Text('Clear DGDA link'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
                     const SizedBox(height: 12),
                     DropdownButtonFormField<ProductCategory>(
                       initialValue: selectedCategory,
@@ -2035,6 +2548,7 @@ class _InventoryTabState extends State<_InventoryTab> {
     }
 
     try {
+      final selectedDgdaData = selectedDgdaMedicine?.allData ?? const {};
       if (product == null) {
         await widget.controller.addProduct(
           name: nameController.text.trim(),
@@ -2044,6 +2558,16 @@ class _InventoryTabState extends State<_InventoryTab> {
           openingStock: stockQty,
           unitsPerPack: safeUnitsPerPack,
           trackInPieces: isMedicine,
+          dgdaBrandId: selectedDgdaMedicine?.brandId,
+          dgdaType: selectedDgdaMedicine?.type,
+          dgdaSlug: selectedDgdaMedicine?.slug,
+          dgdaGenericName: selectedDgdaMedicine?.genericName,
+          dgdaStrength: selectedDgdaMedicine?.strength,
+          dgdaDosageForm: selectedDgdaMedicine?.dosageForm,
+          dgdaManufacturer: selectedDgdaMedicine?.manufacturer,
+          dgdaPackageContainer: selectedDgdaMedicine?.packageContainer,
+          dgdaPackageSize: selectedDgdaMedicine?.packageSize,
+          dgdaData: selectedDgdaData,
         );
       } else {
         await widget.controller.updateProduct(
@@ -2055,6 +2579,16 @@ class _InventoryTabState extends State<_InventoryTab> {
           stockQty: stockQty,
           unitsPerPack: safeUnitsPerPack,
           trackInPieces: isMedicine,
+          dgdaBrandId: selectedDgdaMedicine?.brandId,
+          dgdaType: selectedDgdaMedicine?.type,
+          dgdaSlug: selectedDgdaMedicine?.slug,
+          dgdaGenericName: selectedDgdaMedicine?.genericName,
+          dgdaStrength: selectedDgdaMedicine?.strength,
+          dgdaDosageForm: selectedDgdaMedicine?.dosageForm,
+          dgdaManufacturer: selectedDgdaMedicine?.manufacturer,
+          dgdaPackageContainer: selectedDgdaMedicine?.packageContainer,
+          dgdaPackageSize: selectedDgdaMedicine?.packageSize,
+          dgdaData: selectedDgdaMedicine == null ? null : selectedDgdaData,
         );
       }
     } catch (error) {
@@ -2198,6 +2732,7 @@ class _InventoryTabState extends State<_InventoryTab> {
               itemCount: filteredProducts.length,
               itemBuilder: (context, index) {
                 final product = filteredProducts[index];
+                final hasDgdaData = product.hasDgdaData;
                 final stockColor = product.stockQty == 0
                     ? Colors.red
                     : product.stockQty <= _criticalStockThreshold
@@ -2217,10 +2752,38 @@ class _InventoryTabState extends State<_InventoryTab> {
                       return KeyEventResult.ignored;
                     },
                     child: ListTile(
-                      title: Text(product.name),
-                      subtitle: Text(
-                        '${_categoryLabel(product.category)} • Buy ${_money(product.buyPrice)} • Sell ${_money(product.sellPrice)} • Stock ${_stockDisplay(product)}',
+                      title: Row(
+                        children: [
+                          Expanded(child: Text(product.name)),
+                          if (hasDgdaData)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                'DGDA',
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onPrimaryContainer,
+                                    ),
+                              ),
+                            ),
+                        ],
                       ),
+                      subtitle: Text(
+                        '${_categoryLabel(product.category)} • Buy ${_money(product.buyPrice)} • Sell ${_money(product.sellPrice)} • Stock ${_stockDisplay(product)}${product.dgdaGenericName == null || product.dgdaGenericName!.isEmpty ? '' : '\nGeneric: ${product.dgdaGenericName}'}${product.dgdaManufacturer == null || product.dgdaManufacturer!.isEmpty ? '' : '\nManufacturer: ${product.dgdaManufacturer}'}',
+                      ),
+                      isThreeLine: product.dgdaGenericName != null,
                       leading: CircleAvatar(
                         backgroundColor: stockColor.withValues(alpha: 0.15),
                         child: Text(
@@ -2236,6 +2799,15 @@ class _InventoryTabState extends State<_InventoryTab> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            if (hasDgdaData)
+                              IconButton(
+                                tooltip: 'DGDA details',
+                                onPressed: () => _showDgdaDataDialog(
+                                  title: product.name,
+                                  data: product.dgdaData,
+                                ),
+                                icon: const Icon(Icons.info_outline),
+                              ),
                             TextButton.icon(
                               onPressed: () => _showStockInDialog(product),
                               icon: const Icon(Icons.add_box_outlined),
@@ -2399,7 +2971,8 @@ class _InventoryTabState extends State<_InventoryTab> {
                               final adjustment = adjustmentRecords[index];
                               final product =
                                   productsById[adjustment.productId];
-                              final title = product?.name ?? adjustment.productId;
+                              final title =
+                                  product?.name ?? adjustment.productId;
                               final deltaLabel = _deltaQuantityDisplay(
                                 product,
                                 adjustment.deltaQty,

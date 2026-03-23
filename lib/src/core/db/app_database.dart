@@ -10,7 +10,7 @@ class AppDatabase {
   static const String walkInCustomerId = 'customer-walkin-default';
   static const String walkInCustomerName = 'Walk-in customer';
   static const String _databaseName = 'jarin_pharmacy.db';
-  static const int _databaseVersion = 9;
+  static const int _databaseVersion = 10;
 
   Database? _database;
   Future<Database>? _openingDatabase;
@@ -89,6 +89,42 @@ class AppDatabase {
     if (oldVersion < 9) {
       await _migrateCustomerInvoiceProfiles(db);
     }
+    if (oldVersion < 10) {
+      await _migrateProductDgdaColumns(db);
+    }
+  }
+
+  Future<void> _migrateProductDgdaColumns(Database db) async {
+    await db
+        .execute('ALTER TABLE products ADD COLUMN dgda_brand_id TEXT')
+        .catchError((_) {});
+    await db.execute('ALTER TABLE products ADD COLUMN dgda_type TEXT').catchError(
+      (_) {},
+    );
+    await db.execute('ALTER TABLE products ADD COLUMN dgda_slug TEXT').catchError(
+      (_) {},
+    );
+    await db
+        .execute('ALTER TABLE products ADD COLUMN dgda_generic_name TEXT')
+        .catchError((_) {});
+    await db
+        .execute('ALTER TABLE products ADD COLUMN dgda_strength TEXT')
+        .catchError((_) {});
+    await db
+        .execute('ALTER TABLE products ADD COLUMN dgda_dosage_form TEXT')
+        .catchError((_) {});
+    await db
+        .execute('ALTER TABLE products ADD COLUMN dgda_manufacturer TEXT')
+        .catchError((_) {});
+    await db
+        .execute('ALTER TABLE products ADD COLUMN dgda_package_container TEXT')
+        .catchError((_) {});
+    await db
+        .execute('ALTER TABLE products ADD COLUMN dgda_package_size TEXT')
+        .catchError((_) {});
+    await db
+        .execute('ALTER TABLE products ADD COLUMN dgda_data_json TEXT')
+        .catchError((_) {});
   }
 
   Future<void> _migrateCustomerInvoiceProfiles(Database db) async {
@@ -567,6 +603,16 @@ class AppDatabase {
         stock_qty INTEGER NOT NULL DEFAULT 0,
         units_per_pack INTEGER NOT NULL DEFAULT 1,
         track_in_pieces INTEGER NOT NULL DEFAULT 0,
+        dgda_brand_id TEXT,
+        dgda_type TEXT,
+        dgda_slug TEXT,
+        dgda_generic_name TEXT,
+        dgda_strength TEXT,
+        dgda_dosage_form TEXT,
+        dgda_manufacturer TEXT,
+        dgda_package_container TEXT,
+        dgda_package_size TEXT,
+        dgda_data_json TEXT,
         created_at TEXT NOT NULL
       )
     ''');

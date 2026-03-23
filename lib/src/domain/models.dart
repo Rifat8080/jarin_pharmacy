@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 enum ProductCategory { medicine, stationery }
 
 enum BkashType { cashIn, cashOut, commission }
@@ -16,6 +18,16 @@ class Product {
     required this.stockQty,
     required this.unitsPerPack,
     required this.trackInPieces,
+    required this.dgdaBrandId,
+    required this.dgdaType,
+    required this.dgdaSlug,
+    required this.dgdaGenericName,
+    required this.dgdaStrength,
+    required this.dgdaDosageForm,
+    required this.dgdaManufacturer,
+    required this.dgdaPackageContainer,
+    required this.dgdaPackageSize,
+    required this.dgdaData,
     required this.createdAt,
   });
 
@@ -27,6 +39,16 @@ class Product {
   final int stockQty;
   final int unitsPerPack;
   final bool trackInPieces;
+  final String? dgdaBrandId;
+  final String? dgdaType;
+  final String? dgdaSlug;
+  final String? dgdaGenericName;
+  final String? dgdaStrength;
+  final String? dgdaDosageForm;
+  final String? dgdaManufacturer;
+  final String? dgdaPackageContainer;
+  final String? dgdaPackageSize;
+  final Map<String, String> dgdaData;
   final DateTime createdAt;
 
   Product copyWith({
@@ -38,6 +60,16 @@ class Product {
     int? stockQty,
     int? unitsPerPack,
     bool? trackInPieces,
+    String? dgdaBrandId,
+    String? dgdaType,
+    String? dgdaSlug,
+    String? dgdaGenericName,
+    String? dgdaStrength,
+    String? dgdaDosageForm,
+    String? dgdaManufacturer,
+    String? dgdaPackageContainer,
+    String? dgdaPackageSize,
+    Map<String, String>? dgdaData,
     DateTime? createdAt,
   }) {
     return Product(
@@ -49,9 +81,21 @@ class Product {
       stockQty: stockQty ?? this.stockQty,
       unitsPerPack: unitsPerPack ?? this.unitsPerPack,
       trackInPieces: trackInPieces ?? this.trackInPieces,
+      dgdaBrandId: dgdaBrandId ?? this.dgdaBrandId,
+      dgdaType: dgdaType ?? this.dgdaType,
+      dgdaSlug: dgdaSlug ?? this.dgdaSlug,
+      dgdaGenericName: dgdaGenericName ?? this.dgdaGenericName,
+      dgdaStrength: dgdaStrength ?? this.dgdaStrength,
+      dgdaDosageForm: dgdaDosageForm ?? this.dgdaDosageForm,
+      dgdaManufacturer: dgdaManufacturer ?? this.dgdaManufacturer,
+      dgdaPackageContainer: dgdaPackageContainer ?? this.dgdaPackageContainer,
+      dgdaPackageSize: dgdaPackageSize ?? this.dgdaPackageSize,
+      dgdaData: dgdaData ?? this.dgdaData,
       createdAt: createdAt ?? this.createdAt,
     );
   }
+
+  bool get hasDgdaData => dgdaData.isNotEmpty;
 
   Map<String, Object?> toMap() {
     return {
@@ -63,11 +107,44 @@ class Product {
       'stock_qty': stockQty,
       'units_per_pack': unitsPerPack,
       'track_in_pieces': trackInPieces ? 1 : 0,
+      'dgda_brand_id': dgdaBrandId,
+      'dgda_type': dgdaType,
+      'dgda_slug': dgdaSlug,
+      'dgda_generic_name': dgdaGenericName,
+      'dgda_strength': dgdaStrength,
+      'dgda_dosage_form': dgdaDosageForm,
+      'dgda_manufacturer': dgdaManufacturer,
+      'dgda_package_container': dgdaPackageContainer,
+      'dgda_package_size': dgdaPackageSize,
+      'dgda_data_json': dgdaData.isEmpty ? null : jsonEncode(dgdaData),
       'created_at': createdAt.toIso8601String(),
     };
   }
 
   factory Product.fromMap(Map<String, Object?> map) {
+    Map<String, String> parsedDgdaData() {
+      final rawJson = map['dgda_data_json'] as String?;
+      if (rawJson == null || rawJson.trim().isEmpty) {
+        return const {};
+      }
+
+      try {
+        final decoded = jsonDecode(rawJson);
+        if (decoded is! Map) {
+          return const {};
+        }
+
+        return decoded.map<String, String>((key, value) {
+          return MapEntry(
+            key.toString(),
+            value == null ? '' : value.toString(),
+          );
+        });
+      } catch (_) {
+        return const {};
+      }
+    }
+
     return Product(
       id: map['id'] as String,
       name: map['name'] as String,
@@ -77,6 +154,16 @@ class Product {
       stockQty: map['stock_qty'] as int,
       unitsPerPack: (map['units_per_pack'] as num?)?.toInt() ?? 1,
       trackInPieces: ((map['track_in_pieces'] as num?)?.toInt() ?? 0) == 1,
+      dgdaBrandId: map['dgda_brand_id'] as String?,
+      dgdaType: map['dgda_type'] as String?,
+      dgdaSlug: map['dgda_slug'] as String?,
+      dgdaGenericName: map['dgda_generic_name'] as String?,
+      dgdaStrength: map['dgda_strength'] as String?,
+      dgdaDosageForm: map['dgda_dosage_form'] as String?,
+      dgdaManufacturer: map['dgda_manufacturer'] as String?,
+      dgdaPackageContainer: map['dgda_package_container'] as String?,
+      dgdaPackageSize: map['dgda_package_size'] as String?,
+      dgdaData: parsedDgdaData(),
       createdAt: DateTime.parse(map['created_at'] as String),
     );
   }
@@ -521,6 +608,80 @@ class InventoryAdjustment {
       createdAt: DateTime.parse(map['created_at'] as String),
       note: map['note'] as String?,
     );
+  }
+}
+
+class DgdaMedicine {
+  const DgdaMedicine({
+    required this.brandId,
+    required this.brandName,
+    required this.type,
+    required this.slug,
+    required this.genericName,
+    required this.strength,
+    required this.dosageForm,
+    required this.manufacturer,
+    required this.darNumber,
+    required this.packageContainer,
+    required this.packageSize,
+    required this.drugClass,
+    required this.indication,
+    required this.monographLink,
+    required this.allData,
+  });
+
+  final String brandId;
+  final String brandName;
+  final String type;
+  final String slug;
+  final String genericName;
+  final String strength;
+  final String dosageForm;
+  final String manufacturer;
+  final String darNumber;
+  final String packageContainer;
+  final String packageSize;
+  final String drugClass;
+  final String indication;
+  final String monographLink;
+  final Map<String, String> allData;
+
+  String get displayName {
+    final buffer = StringBuffer(brandName.trim());
+    if (strength.trim().isNotEmpty) {
+      buffer.write(' ${strength.trim()}');
+    }
+    if (dosageForm.trim().isNotEmpty) {
+      buffer.write(' (${dosageForm.trim()})');
+    }
+    return buffer.toString().trim();
+  }
+
+  bool matchesQuery(String query) {
+    final normalized = query.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      return false;
+    }
+
+    if (brandName.toLowerCase().contains(normalized) ||
+        genericName.toLowerCase().contains(normalized) ||
+        strength.toLowerCase().contains(normalized) ||
+        dosageForm.toLowerCase().contains(normalized) ||
+        manufacturer.toLowerCase().contains(normalized) ||
+        darNumber.toLowerCase().contains(normalized) ||
+        indication.toLowerCase().contains(normalized) ||
+        drugClass.toLowerCase().contains(normalized) ||
+        type.toLowerCase().contains(normalized)) {
+      return true;
+    }
+
+    for (final value in allData.values) {
+      if (value.toLowerCase().contains(normalized)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 }
 

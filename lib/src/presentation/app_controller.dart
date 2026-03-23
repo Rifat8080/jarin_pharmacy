@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../core/db/app_database.dart';
+import '../domain/dgda_repository.dart';
 import '../domain/models.dart';
 import '../domain/reporting.dart';
 import '../domain/repositories.dart';
@@ -10,9 +11,11 @@ class PharmacyAppController extends ChangeNotifier {
     ProductRepository? productRepository,
     TransactionRepository? transactionRepository,
     ReportingService? reportingService,
+    DgdaDatasetRepository? dgdaDatasetRepository,
   }) : _products = productRepository ?? ProductRepository(AppDatabase.instance),
        _transactions =
            transactionRepository ?? TransactionRepository(AppDatabase.instance),
+       _dgda = dgdaDatasetRepository ?? DgdaDatasetRepository(),
        _reporting =
            reportingService ??
            ReportingService(
@@ -25,6 +28,7 @@ class PharmacyAppController extends ChangeNotifier {
 
   final ProductRepository _products;
   final TransactionRepository _transactions;
+  final DgdaDatasetRepository _dgda;
   final ReportingService _reporting;
 
   bool isLoading = false;
@@ -38,6 +42,7 @@ class PharmacyAppController extends ChangeNotifier {
   Map<String, CustomerDueSummary> customerDueSummaries = const {};
   List<BkashTransaction> bkashTransactions = const [];
   List<InventoryAdjustment> adjustments = const [];
+  List<DgdaMedicine> dgdaMedicines = const [];
 
   ReportPeriod reportPeriod = ReportPeriod.day;
   DateTime reportAnchorDate = DateTime.now();
@@ -45,7 +50,38 @@ class PharmacyAppController extends ChangeNotifier {
   DashboardReport? dashboardReport;
 
   Future<void> initialize() async {
+    dgdaMedicines = await _dgda.loadMedicines();
     await refreshAll();
+  }
+
+  bool get hasDgdaDataset => dgdaMedicines.isNotEmpty;
+
+  List<DgdaMedicine> searchDgdaMedicines(String query, {int limit = 40}) {
+    final normalized = query.trim().toLowerCase();
+    if (normalized.isEmpty || dgdaMedicines.isEmpty) {
+      return const [];
+    }
+
+    final startsWith = <DgdaMedicine>[];
+    final contains = <DgdaMedicine>[];
+
+    for (final medicine in dgdaMedicines) {
+      if (!medicine.matchesQuery(normalized)) {
+        continue;
+      }
+
+      if (medicine.brandName.toLowerCase().startsWith(normalized)) {
+        startsWith.add(medicine);
+      } else {
+        contains.add(medicine);
+      }
+
+      if (startsWith.length + contains.length >= limit) {
+        break;
+      }
+    }
+
+    return [...startsWith, ...contains];
   }
 
   Future<void> refreshAll() async {
@@ -112,6 +148,16 @@ class PharmacyAppController extends ChangeNotifier {
     required int openingStock,
     int unitsPerPack = 1,
     bool trackInPieces = false,
+    String? dgdaBrandId,
+    String? dgdaType,
+    String? dgdaSlug,
+    String? dgdaGenericName,
+    String? dgdaStrength,
+    String? dgdaDosageForm,
+    String? dgdaManufacturer,
+    String? dgdaPackageContainer,
+    String? dgdaPackageSize,
+    Map<String, String> dgdaData = const {},
   }) async {
     final isMedicine = category == ProductCategory.medicine;
     await _products.createProduct(
@@ -124,6 +170,16 @@ class PharmacyAppController extends ChangeNotifier {
         stockQty: openingStock,
         unitsPerPack: isMedicine ? unitsPerPack : 1,
         trackInPieces: isMedicine ? true : false,
+        dgdaBrandId: isMedicine ? dgdaBrandId : null,
+        dgdaType: isMedicine ? dgdaType : null,
+        dgdaSlug: isMedicine ? dgdaSlug : null,
+        dgdaGenericName: isMedicine ? dgdaGenericName : null,
+        dgdaStrength: isMedicine ? dgdaStrength : null,
+        dgdaDosageForm: isMedicine ? dgdaDosageForm : null,
+        dgdaManufacturer: isMedicine ? dgdaManufacturer : null,
+        dgdaPackageContainer: isMedicine ? dgdaPackageContainer : null,
+        dgdaPackageSize: isMedicine ? dgdaPackageSize : null,
+        dgdaData: isMedicine ? dgdaData : const {},
         createdAt: DateTime.now(),
       ),
     );
@@ -139,6 +195,16 @@ class PharmacyAppController extends ChangeNotifier {
     required int stockQty,
     int unitsPerPack = 1,
     bool trackInPieces = false,
+    String? dgdaBrandId,
+    String? dgdaType,
+    String? dgdaSlug,
+    String? dgdaGenericName,
+    String? dgdaStrength,
+    String? dgdaDosageForm,
+    String? dgdaManufacturer,
+    String? dgdaPackageContainer,
+    String? dgdaPackageSize,
+    Map<String, String>? dgdaData,
   }) async {
     final isMedicine = category == ProductCategory.medicine;
     final existing = products.firstWhere((item) => item.id == productId);
@@ -151,6 +217,28 @@ class PharmacyAppController extends ChangeNotifier {
         stockQty: stockQty,
         unitsPerPack: isMedicine ? unitsPerPack : 1,
         trackInPieces: isMedicine ? true : false,
+        dgdaBrandId: isMedicine ? (dgdaBrandId ?? existing.dgdaBrandId) : null,
+        dgdaType: isMedicine ? (dgdaType ?? existing.dgdaType) : null,
+        dgdaSlug: isMedicine ? (dgdaSlug ?? existing.dgdaSlug) : null,
+        dgdaGenericName: isMedicine
+          ? (dgdaGenericName ?? existing.dgdaGenericName)
+          : null,
+        dgdaStrength: isMedicine ? (dgdaStrength ?? existing.dgdaStrength) : null,
+        dgdaDosageForm: isMedicine
+          ? (dgdaDosageForm ?? existing.dgdaDosageForm)
+          : null,
+        dgdaManufacturer: isMedicine
+          ? (dgdaManufacturer ?? existing.dgdaManufacturer)
+          : null,
+        dgdaPackageContainer: isMedicine
+          ? (dgdaPackageContainer ?? existing.dgdaPackageContainer)
+          : null,
+        dgdaPackageSize: isMedicine
+          ? (dgdaPackageSize ?? existing.dgdaPackageSize)
+          : null,
+        dgdaData: isMedicine
+            ? (dgdaData ?? existing.dgdaData)
+            : const <String, String>{},
       ),
     );
     await refreshAll();

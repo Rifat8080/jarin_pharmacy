@@ -68,7 +68,7 @@ class PharmacyApp extends ConsumerWidget {
             );
           case AppRoutes.customers:
             return MaterialPageRoute(
-              builder: (_) => const CustomerListPage(),
+              builder: (_) => const PharmacyHomePage(initialTab: 5),
               settings: settings,
             );
           case AppRoutes.customerShow:
