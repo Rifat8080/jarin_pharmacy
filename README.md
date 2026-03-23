@@ -1,1 +1,0 @@
-# jarin_pharmacy
