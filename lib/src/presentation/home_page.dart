@@ -1262,81 +1262,78 @@ class _SellTabState extends State<_SellTab> {
     Widget buildProductPane() {
       return filteredProducts.isEmpty
           ? const Center(child: Text('No in-stock products found.'))
-          : Scrollbar(
-              thumbVisibility: true,
-              child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-                itemCount: filteredProducts.length,
-                itemBuilder: (context, index) {
-                  final product = filteredProducts[index];
-                  final supportsPiecePack =
-                      product.trackInPieces && product.unitsPerPack > 1;
-                  final inCart = _cart.where(
-                    (item) => item.product.id == product.id,
-                  );
-                  final quantityInCart = inCart.isEmpty
-                      ? 0
-                      : inCart.first.quantity;
+          : ListView.builder(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+              itemCount: filteredProducts.length,
+              itemBuilder: (context, index) {
+                final product = filteredProducts[index];
+                final supportsPiecePack =
+                    product.trackInPieces && product.unitsPerPack > 1;
+                final inCart = _cart.where(
+                  (item) => item.product.id == product.id,
+                );
+                final quantityInCart = inCart.isEmpty
+                    ? 0
+                    : inCart.first.quantity;
 
-                  return Card(
-                    child: Focus(
-                      onKeyEvent: (node, event) {
-                        if (event is KeyDownEvent &&
-                            event.logicalKey == LogicalKeyboardKey.enter) {
-                          _addProductToCart(product, quantityToAdd: 1);
-                          return KeyEventResult.handled;
-                        }
-                        return KeyEventResult.ignored;
-                      },
-                      child: ListTile(
-                        title: Text(product.name),
-                        subtitle: Text(
-                          '${_categoryLabel(product.category)} • ${_money(product.sellPrice)} • Stock ${_stockDisplay(product)}',
-                        ),
-                        trailing: supportsPiecePack
-                            ? Wrap(
-                                spacing: 8,
-                                children: [
-                                  OutlinedButton(
-                                    onPressed: () => _addProductToCart(
-                                      product,
-                                      quantityToAdd: product.unitsPerPack,
-                                    ),
-                                    child: const Text('Pack'),
-                                  ),
-                                  FilledButton(
-                                    onPressed: () => _addProductToCart(
-                                      product,
-                                      quantityToAdd: 1,
-                                    ),
-                                    child: Text(
-                                      quantityInCart == 0
-                                          ? 'Piece'
-                                          : _cartQuantityLabel(
-                                              product,
-                                              quantityInCart,
-                                            ),
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : FilledButton.icon(
-                                onPressed: () => _addProductToCart(
-                                  product,
-                                  quantityToAdd: 1,
-                                ),
-                                icon: const Icon(Icons.add),
-                                label: Text(
-                                  quantityInCart == 0
-                                      ? 'Add'
-                                      : 'x$quantityInCart',
-                                ),
-                              ),
+                return Card(
+                  child: Focus(
+                    onKeyEvent: (node, event) {
+                      if (event is KeyDownEvent &&
+                          event.logicalKey == LogicalKeyboardKey.enter) {
+                        _addProductToCart(product, quantityToAdd: 1);
+                        return KeyEventResult.handled;
+                      }
+                      return KeyEventResult.ignored;
+                    },
+                    child: ListTile(
+                      title: Text(product.name),
+                      subtitle: Text(
+                        '${_categoryLabel(product.category)} • ${_money(product.sellPrice)} • Stock ${_stockDisplay(product)}',
                       ),
+                      trailing: supportsPiecePack
+                          ? Wrap(
+                              spacing: 8,
+                              children: [
+                                OutlinedButton(
+                                  onPressed: () => _addProductToCart(
+                                    product,
+                                    quantityToAdd: product.unitsPerPack,
+                                  ),
+                                  child: const Text('Pack'),
+                                ),
+                                FilledButton(
+                                  onPressed: () => _addProductToCart(
+                                    product,
+                                    quantityToAdd: 1,
+                                  ),
+                                  child: Text(
+                                    quantityInCart == 0
+                                        ? 'Piece'
+                                        : _cartQuantityLabel(
+                                            product,
+                                            quantityInCart,
+                                          ),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : FilledButton.icon(
+                              onPressed: () => _addProductToCart(
+                                product,
+                                quantityToAdd: 1,
+                              ),
+                              icon: const Icon(Icons.add),
+                              label: Text(
+                                quantityInCart == 0
+                                    ? 'Add'
+                                    : 'x$quantityInCart',
+                              ),
+                            ),
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             );
     }
 
@@ -1359,70 +1356,67 @@ class _SellTabState extends State<_SellTab> {
             Expanded(
               child: _cart.isEmpty
                   ? const Center(child: Text('Add products to start a bill.'))
-                  : Scrollbar(
-                      thumbVisibility: true,
-                      child: ListView.builder(
-                        itemCount: _cart.length,
-                        itemBuilder: (context, index) {
-                          final item = _cart[index];
-                          final supportsPiecePack =
-                              item.product.trackInPieces &&
-                              item.product.unitsPerPack > 1;
-                          return ListTile(
-                            title: Text(item.product.name),
-                            subtitle: Text(
-                              '${supportsPiecePack ? _cartQuantityLabel(item.product, item.quantity) : item.quantity} x ${_money(item.unitPrice)} = ${_money(item.total)}',
-                            ),
-                            leading: _QuantityStepper(
-                              quantity: item.quantity,
-                              onDecrease: () => _changeCartQuantity(index, -1),
-                              onIncrease: () => _changeCartQuantity(index, 1),
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (supportsPiecePack)
-                                  IconButton(
-                                    onPressed: () {
-                                      final removed = _changeCartQuantity(
-                                        index,
-                                        -item.product.unitsPerPack,
-                                      );
-                                      if (removed && mounted) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              '${item.product.name} removed from bill.',
-                                            ),
-                                            duration: const Duration(
-                                              seconds: 1,
-                                            ),
+                  : ListView.builder(
+                      itemCount: _cart.length,
+                      itemBuilder: (context, index) {
+                        final item = _cart[index];
+                        final supportsPiecePack =
+                            item.product.trackInPieces &&
+                            item.product.unitsPerPack > 1;
+                        return ListTile(
+                          title: Text(item.product.name),
+                          subtitle: Text(
+                            '${supportsPiecePack ? _cartQuantityLabel(item.product, item.quantity) : item.quantity} x ${_money(item.unitPrice)} = ${_money(item.total)}',
+                          ),
+                          leading: _QuantityStepper(
+                            quantity: item.quantity,
+                            onDecrease: () => _changeCartQuantity(index, -1),
+                            onIncrease: () => _changeCartQuantity(index, 1),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (supportsPiecePack)
+                                IconButton(
+                                  onPressed: () {
+                                    final removed = _changeCartQuantity(
+                                      index,
+                                      -item.product.unitsPerPack,
+                                    );
+                                    if (removed && mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            '${item.product.name} removed from bill.',
                                           ),
-                                        );
-                                      }
-                                    },
-                                    tooltip: 'Pack -',
-                                    icon: const Icon(
-                                      Icons.indeterminate_check_box_outlined,
-                                    ),
+                                          duration: const Duration(
+                                            seconds: 1,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  tooltip: 'Pack -',
+                                  icon: const Icon(
+                                    Icons.indeterminate_check_box_outlined,
                                   ),
-                                if (supportsPiecePack)
-                                  IconButton(
-                                    onPressed:
-                                        item.quantity +
-                                                item.product.unitsPerPack <=
-                                            item.product.stockQty
-                                        ? () => _changeCartQuantity(
-                                            index,
-                                            item.product.unitsPerPack,
-                                          )
-                                        : null,
-                                    tooltip: 'Pack +',
-                                    icon: const Icon(Icons.add_box_outlined),
-                                  ),
-                                PopupMenuButton<String>(
+                                ),
+                              if (supportsPiecePack)
+                                IconButton(
+                                  onPressed:
+                                      item.quantity + item.product.unitsPerPack <=
+                                          item.product.stockQty
+                                      ? () => _changeCartQuantity(
+                                          index,
+                                          item.product.unitsPerPack,
+                                        )
+                                      : null,
+                                  tooltip: 'Pack +',
+                                  icon: const Icon(Icons.add_box_outlined),
+                                ),
+                              PopupMenuButton<String>(
                                   onSelected: (value) {
                                     if (value == 'price') {
                                       _editCartPrice(index);
@@ -1457,12 +1451,11 @@ class _SellTabState extends State<_SellTab> {
                                       child: Text('Remove'),
                                     ),
                                   ],
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
             ),
             Padding(
@@ -2200,91 +2193,88 @@ class _InventoryTabState extends State<_InventoryTab> {
     Widget productsPane() {
       return filteredProducts.isEmpty
           ? const Center(child: Text('No products found.'))
-          : Scrollbar(
-              thumbVisibility: true,
-              child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-                itemCount: filteredProducts.length,
-                itemBuilder: (context, index) {
-                  final product = filteredProducts[index];
-                  final stockColor = product.stockQty == 0
-                      ? Colors.red
-                      : product.stockQty <= _criticalStockThreshold
-                      ? Colors.deepOrange
-                      : product.stockQty <= _lowStockThreshold
-                      ? Colors.orange
-                      : Colors.green;
+          : ListView.builder(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+              itemCount: filteredProducts.length,
+              itemBuilder: (context, index) {
+                final product = filteredProducts[index];
+                final stockColor = product.stockQty == 0
+                    ? Colors.red
+                    : product.stockQty <= _criticalStockThreshold
+                    ? Colors.deepOrange
+                    : product.stockQty <= _lowStockThreshold
+                    ? Colors.orange
+                    : Colors.green;
 
-                  return Card(
-                    child: Focus(
-                      onKeyEvent: (node, event) {
-                        if (event is KeyDownEvent &&
-                            event.logicalKey == LogicalKeyboardKey.enter) {
-                          _showStockInDialog(product);
-                          return KeyEventResult.handled;
-                        }
-                        return KeyEventResult.ignored;
-                      },
-                      child: ListTile(
-                        title: Text(product.name),
-                        subtitle: Text(
-                          '${_categoryLabel(product.category)} • Buy ${_money(product.buyPrice)} • Sell ${_money(product.sellPrice)} • Stock ${_stockDisplay(product)}',
-                        ),
-                        leading: CircleAvatar(
-                          backgroundColor: stockColor.withValues(alpha: 0.15),
-                          child: Text(
-                            _stockShortDisplay(product),
-                            style: TextStyle(
-                              color: stockColor,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        trailing: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 230),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              TextButton.icon(
-                                onPressed: () => _showStockInDialog(product),
-                                icon: const Icon(Icons.add_box_outlined),
-                                label: const Text('Stock In'),
-                              ),
-                              PopupMenuButton<String>(
-                                onSelected: (value) {
-                                  if (value == 'edit') {
-                                    _showProductDialog(product: product);
-                                  }
-                                  if (value == 'adjust') {
-                                    _showAdjustmentDialog(product);
-                                  }
-                                  if (value == 'delete') {
-                                    _deleteProduct(product);
-                                  }
-                                },
-                                itemBuilder: (context) => const [
-                                  PopupMenuItem(
-                                    value: 'edit',
-                                    child: Text('Edit'),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'adjust',
-                                    child: Text('Adjust Stock'),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'delete',
-                                    child: Text('Delete'),
-                                  ),
-                                ],
-                              ),
-                            ],
+                return Card(
+                  child: Focus(
+                    onKeyEvent: (node, event) {
+                      if (event is KeyDownEvent &&
+                          event.logicalKey == LogicalKeyboardKey.enter) {
+                        _showStockInDialog(product);
+                        return KeyEventResult.handled;
+                      }
+                      return KeyEventResult.ignored;
+                    },
+                    child: ListTile(
+                      title: Text(product.name),
+                      subtitle: Text(
+                        '${_categoryLabel(product.category)} • Buy ${_money(product.buyPrice)} • Sell ${_money(product.sellPrice)} • Stock ${_stockDisplay(product)}',
+                      ),
+                      leading: CircleAvatar(
+                        backgroundColor: stockColor.withValues(alpha: 0.15),
+                        child: Text(
+                          _stockShortDisplay(product),
+                          style: TextStyle(
+                            color: stockColor,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
+                      trailing: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 230),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextButton.icon(
+                              onPressed: () => _showStockInDialog(product),
+                              icon: const Icon(Icons.add_box_outlined),
+                              label: const Text('Stock In'),
+                            ),
+                            PopupMenuButton<String>(
+                              onSelected: (value) {
+                                if (value == 'edit') {
+                                  _showProductDialog(product: product);
+                                }
+                                if (value == 'adjust') {
+                                  _showAdjustmentDialog(product);
+                                }
+                                if (value == 'delete') {
+                                  _deleteProduct(product);
+                                }
+                              },
+                              itemBuilder: (context) => const [
+                                PopupMenuItem(
+                                  value: 'edit',
+                                  child: Text('Edit'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'adjust',
+                                  child: Text('Adjust Stock'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'delete',
+                                  child: Text('Delete'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             );
     }
 
@@ -2364,41 +2354,36 @@ class _InventoryTabState extends State<_InventoryTab> {
                         ? const Center(
                             child: Text('No stock in records for this filter.'),
                           )
-                        : Scrollbar(
-                            thumbVisibility: true,
-                            child: ListView.separated(
-                              itemCount: stockInRecords.length,
-                              separatorBuilder: (_, _) =>
-                                  const SizedBox(height: 4),
-                              itemBuilder: (context, index) {
-                                final purchase = stockInRecords[index];
-                                final product =
-                                    productsById[purchase.productId];
-                                final title =
-                                    product?.name ?? purchase.productId;
-                                final quantityLabel = product == null
-                                    ? '${purchase.quantity} units'
-                                    : _quantityDisplay(
-                                        product,
-                                        purchase.quantity,
-                                      );
+                        : ListView.separated(
+                            itemCount: stockInRecords.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 4),
+                            itemBuilder: (context, index) {
+                              final purchase = stockInRecords[index];
+                              final product = productsById[purchase.productId];
+                              final title = product?.name ?? purchase.productId;
+                              final quantityLabel = product == null
+                                  ? '${purchase.quantity} units'
+                                  : _quantityDisplay(
+                                      product,
+                                      purchase.quantity,
+                                    );
 
-                                return Card(
-                                  child: ListTile(
-                                    title: Text(title),
-                                    subtitle: Text(
-                                      '${_dateTimeLabel(purchase.createdAt)} • Qty $quantityLabel • Unit ${_money(purchase.unitPrice)}',
-                                    ),
-                                    trailing: Text(
-                                      _money(purchase.total),
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                              return Card(
+                                child: ListTile(
+                                  title: Text(title),
+                                  subtitle: Text(
+                                    '${_dateTimeLabel(purchase.createdAt)} • Qty $quantityLabel • Unit ${_money(purchase.unitPrice)}',
+                                  ),
+                                  trailing: Text(
+                                    _money(purchase.total),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                );
-                              },
-                            ),
+                                ),
+                              );
+                            },
                           ))
                   : (adjustmentRecords.isEmpty
                         ? const Center(
@@ -2406,39 +2391,35 @@ class _InventoryTabState extends State<_InventoryTab> {
                               'No adjustment records for this filter.',
                             ),
                           )
-                        : Scrollbar(
-                            thumbVisibility: true,
-                            child: ListView.separated(
-                              itemCount: adjustmentRecords.length,
-                              separatorBuilder: (_, _) =>
-                                  const SizedBox(height: 4),
-                              itemBuilder: (context, index) {
-                                final adjustment = adjustmentRecords[index];
-                                final product =
-                                    productsById[adjustment.productId];
-                                final title =
-                                    product?.name ?? adjustment.productId;
-                                final deltaLabel = _deltaQuantityDisplay(
-                                  product,
-                                  adjustment.deltaQty,
-                                );
+                        : ListView.separated(
+                            itemCount: adjustmentRecords.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 4),
+                            itemBuilder: (context, index) {
+                              final adjustment = adjustmentRecords[index];
+                              final product =
+                                  productsById[adjustment.productId];
+                              final title = product?.name ?? adjustment.productId;
+                              final deltaLabel = _deltaQuantityDisplay(
+                                product,
+                                adjustment.deltaQty,
+                              );
 
-                                return Card(
-                                  child: ListTile(
-                                    title: Text(title),
-                                    subtitle: Text(
-                                      '${_dateTimeLabel(adjustment.createdAt)} • ${adjustment.reason} • Qty $deltaLabel',
-                                    ),
-                                    trailing: Text(
-                                      _money(adjustment.lossValue),
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                              return Card(
+                                child: ListTile(
+                                  title: Text(title),
+                                  subtitle: Text(
+                                    '${_dateTimeLabel(adjustment.createdAt)} • ${adjustment.reason} • Qty $deltaLabel',
+                                  ),
+                                  trailing: Text(
+                                    _money(adjustment.lossValue),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                );
-                              },
-                            ),
+                                ),
+                              );
+                            },
                           )),
             ),
           ],

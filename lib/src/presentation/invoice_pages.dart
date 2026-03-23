@@ -84,44 +84,27 @@ class InvoiceListPage extends ConsumerWidget {
                   child: ListTile(
                     title: Text(invoice.invoiceNumber),
                     subtitle: Text(
-                      '${invoice.customerName ?? 'Walk-in customer'}${invoice.customerPhone == null ? '' : ' • ${invoice.customerPhone}'}\n${_invoiceDate(invoice.createdAt)}',
+                      '${invoice.customerName ?? 'Walk-in customer'}${invoice.customerPhone == null ? '' : ' • ${invoice.customerPhone}'}\n${_invoiceDate(invoice.createdAt)} • Due ${_invoiceMoney(invoice.dueAmount)}',
                     ),
                     isThreeLine: true,
                     trailing: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Container(
-                          margin: const EdgeInsets.only(bottom: 6),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _invoiceStatusColor(
-                              context,
-                              invoice.paymentStatus,
-                            ).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            _invoiceStatusLabel(invoice.paymentStatus),
-                            style: TextStyle(
-                              color: _invoiceStatusColor(
-                                context,
-                                invoice.paymentStatus,
-                              ),
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
                         Text(
                           _invoiceMoney(invoice.total),
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         Text(
-                          'Due ${_invoiceMoney(invoice.dueAmount)}',
-                          style: Theme.of(context).textTheme.bodySmall,
+                          _invoiceStatusLabel(invoice.paymentStatus),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: _invoiceStatusColor(
+                                  context,
+                                  invoice.paymentStatus,
+                                ),
+                                fontWeight: FontWeight.w700,
+                              ),
                         ),
                       ],
                     ),
