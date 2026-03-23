@@ -823,6 +823,7 @@ class TransactionRepository {
   }
 
   Future<BkashTransaction> createBkash({
+    required String accountId,
     required BkashType type,
     required double amount,
     required double charge,
@@ -833,23 +834,38 @@ class TransactionRepository {
     final id = _uuid.v4();
 
     final netAmount = switch (type) {
-      BkashType.cashIn => amount - charge,
-      BkashType.cashOut => -(amount + charge),
-      BkashType.commission => amount,
+      BkashType.cashIn => amount,
+      BkashType.cashOut => -amount,
+      BkashType.sendMoney => -amount,
+      BkashType.billPayment => -amount,
+      BkashType.commission => 0.0,
     };
 
-    await db.insert('bkash_transactions', {
-      'id': id,
-      'type': type.name,
-      'amount': amount,
-      'charge': charge,
-      'net_amount': netAmount,
-      'created_at': date.toIso8601String(),
-      'note': note,
+    await db.transaction((txn) async {
+      await _applyBkashAccountImpact(
+        txn: txn,
+        accountId: accountId,
+        type: type,
+        amount: amount,
+        charge: charge,
+        reverse: false,
+      );
+
+      await txn.insert('bkash_transactions', {
+        'id': id,
+        'account_id': accountId,
+        'type': type.name,
+        'amount': amount,
+        'charge': charge,
+        'net_amount': netAmount,
+        'created_at': date.toIso8601String(),
+        'note': note,
+      });
     });
 
     return BkashTransaction(
       id: id,
+      accountId: accountId,
       type: type,
       amount: amount,
       charge: charge,
@@ -861,6 +877,7 @@ class TransactionRepository {
 
   Future<void> updateBkash({
     required String bkashId,
+    required String accountId,
     required BkashType type,
     required double amount,
     required double charge,
@@ -874,33 +891,145 @@ class TransactionRepository {
     }
 
     final netAmount = switch (type) {
-      BkashType.cashIn => amount - charge,
-      BkashType.cashOut => -(amount + charge),
-      BkashType.commission => amount,
+      BkashType.cashIn => amount,
+      BkashType.cashOut => -amount,
+      BkashType.sendMoney => -amount,
+      BkashType.billPayment => -amount,
+      BkashType.commission => 0.0,
     };
 
-    await db.update(
-      'bkash_transactions',
-      {
-        'type': type.name,
-        'amount': amount,
-        'charge': charge,
-        'net_amount': netAmount,
-        'created_at': (date ?? existing.createdAt).toIso8601String(),
-        'note': note,
-      },
-      where: 'id = ?',
-      whereArgs: [bkashId],
-    );
+    await db.transaction((txn) async {
+      await _applyBkashAccountImpact(
+        txn: txn,
+        accountId: existing.accountId,
+        type: existing.type,
+        amount: existing.amount,
+        charge: existing.charge,
+        reverse: true,
+      );
+
+      await _applyBkashAccountImpact(
+        txn: txn,
+        accountId: accountId,
+        type: type,
+        amount: amount,
+        charge: charge,
+        reverse: false,
+      );
+
+      await txn.update(
+        'bkash_transactions',
+        {
+          'account_id': accountId,
+          'type': type.name,
+          'amount': amount,
+          'charge': charge,
+          'net_amount': netAmount,
+          'created_at': (date ?? existing.createdAt).toIso8601String(),
+          'note': note,
+        },
+        where: 'id = ?',
+        whereArgs: [bkashId],
+      );
+    });
   }
 
   Future<void> deleteBkash(String bkashId) async {
     final db = await _database.database;
-    await db.delete(
-      'bkash_transactions',
-      where: 'id = ?',
-      whereArgs: [bkashId],
+    final existing = await getBkashById(bkashId);
+    if (existing == null) {
+      return;
+    }
+
+    await db.transaction((txn) async {
+      await _applyBkashAccountImpact(
+        txn: txn,
+        accountId: existing.accountId,
+        type: existing.type,
+        amount: existing.amount,
+        charge: existing.charge,
+        reverse: true,
+      );
+
+      await txn.delete(
+        'bkash_transactions',
+        where: 'id = ?',
+        whereArgs: [bkashId],
+      );
+    });
+  }
+
+  Future<BkashAccount> createBkashAccount({
+    required String name,
+    required double openingBkashBalance,
+    required double openingCashBalance,
+  }) async {
+    final db = await _database.database;
+    final id = _uuid.v4();
+    final createdAt = DateTime.now();
+
+    await db.insert('bkash_accounts', {
+      'id': id,
+      'name': name.trim(),
+      'bkash_balance': openingBkashBalance,
+      'cash_balance': openingCashBalance,
+      'created_at': createdAt.toIso8601String(),
+    });
+
+    return BkashAccount(
+      id: id,
+      name: name.trim(),
+      bkashBalance: openingBkashBalance,
+      cashBalance: openingCashBalance,
+      createdAt: createdAt,
     );
+  }
+
+  Future<List<BkashAccount>> getBkashAccounts() async {
+    final db = await _database.database;
+    final rows = await db.query(
+      'bkash_accounts',
+      orderBy: 'name COLLATE NOCASE',
+    );
+    return rows.map(BkashAccount.fromMap).toList();
+  }
+
+  Future<void> updateBkashAccount({
+    required String accountId,
+    required String name,
+    required double bkashBalance,
+    required double cashBalance,
+  }) async {
+    final db = await _database.database;
+    await db.update(
+      'bkash_accounts',
+      {
+        'name': name.trim(),
+        'bkash_balance': bkashBalance,
+        'cash_balance': cashBalance,
+      },
+      where: 'id = ?',
+      whereArgs: [accountId],
+    );
+  }
+
+  Future<void> deleteBkashAccount(String accountId) async {
+    final db = await _database.database;
+
+    // Check if account has any transactions
+    final transactions = await db.query(
+      'bkash_transactions',
+      where: 'account_id = ?',
+      whereArgs: [accountId],
+    );
+
+    if (transactions.isNotEmpty) {
+      throw StateError(
+        'Cannot delete account: it has ${transactions.length} transaction(s). Delete transactions first.',
+      );
+    }
+
+    await db.delete('bkash_accounts', where: 'id = ?', whereArgs: [accountId]);
   }
 
   Future<Purchase?> getPurchaseById(String id) async {
@@ -957,6 +1086,44 @@ class TransactionRepository {
       return null;
     }
     return BkashTransaction.fromMap(rows.first);
+  }
+
+  Future<void> _applyBkashAccountImpact({
+    required Transaction txn,
+    required String accountId,
+    required BkashType type,
+    required double amount,
+    required double charge,
+    required bool reverse,
+  }) async {
+    final multiplier = reverse ? -1.0 : 1.0;
+    double deltaBkash = 0;
+    double deltaCash = 0;
+
+    switch (type) {
+      case BkashType.cashIn:
+        deltaBkash = amount;
+        deltaCash = 0;
+        break;
+      case BkashType.sendMoney:
+      case BkashType.billPayment:
+        deltaBkash = -amount;
+        deltaCash = amount + charge;
+        break;
+      case BkashType.cashOut:
+        deltaBkash = -amount;
+        deltaCash = amount + charge;
+        break;
+      case BkashType.commission:
+        deltaBkash = 0;
+        deltaCash = amount;
+        break;
+    }
+
+    await txn.rawUpdate(
+      'UPDATE bkash_accounts SET bkash_balance = bkash_balance + ?, cash_balance = cash_balance + ? WHERE id = ?',
+      [deltaBkash * multiplier, deltaCash * multiplier, accountId],
+    );
   }
 
   Future<List<Purchase>> getPurchasesInRange(
@@ -1059,6 +1226,421 @@ class TransactionRepository {
       orderBy: 'created_at DESC',
     );
     return rows.map(BkashTransaction.fromMap).toList();
+  }
+
+  Future<BkashReportSummary?> getBkashDailyReport({
+    required String accountId,
+    required DateTime date,
+  }) async {
+    return _getBkashReportSummary(
+      accountId: accountId,
+      startDate: DateTime(date.year, date.month, date.day),
+      endDate: DateTime(date.year, date.month, date.day + 1),
+      period: 'Daily',
+    );
+  }
+
+  Future<BkashReportSummary?> getBkashWeeklyReport({
+    required String accountId,
+    required DateTime date,
+  }) async {
+    final startOfWeek = date.subtract(Duration(days: date.weekday - 1));
+    final startDate = DateTime(
+      startOfWeek.year,
+      startOfWeek.month,
+      startOfWeek.day,
+    );
+    final endDate = startDate.add(const Duration(days: 7));
+
+    return _getBkashReportSummary(
+      accountId: accountId,
+      startDate: startDate,
+      endDate: endDate,
+      period: 'Weekly',
+    );
+  }
+
+  Future<BkashReportSummary?> getBkashMonthlyReport({
+    required String accountId,
+    required int year,
+    required int month,
+  }) async {
+    final startDate = DateTime(year, month, 1);
+    final endDate = month == 12
+        ? DateTime(year + 1, 1, 1)
+        : DateTime(year, month + 1, 1);
+
+    return _getBkashReportSummary(
+      accountId: accountId,
+      startDate: startDate,
+      endDate: endDate,
+      period: 'Monthly',
+    );
+  }
+
+  Future<BkashReportSummary?> getBkashYearlyReport({
+    required String accountId,
+    required int year,
+  }) async {
+    final startDate = DateTime(year, 1, 1);
+    final endDate = DateTime(year + 1, 1, 1);
+
+    return _getBkashReportSummary(
+      accountId: accountId,
+      startDate: startDate,
+      endDate: endDate,
+      period: 'Yearly',
+    );
+  }
+
+  Future<BkashReportSummary?> _getBkashReportSummary({
+    required String accountId,
+    required DateTime startDate,
+    required DateTime endDate,
+    required String period,
+  }) async {
+    final db = await _database.database;
+
+    // Get account details
+    final accountRows = await db.query(
+      'bkash_accounts',
+      where: 'id = ?',
+      whereArgs: [accountId],
+      limit: 1,
+    );
+
+    if (accountRows.isEmpty) {
+      return null;
+    }
+
+    final account = BkashAccount.fromMap(accountRows.first);
+
+    // Get opening balance (balance before the period starts)
+    final beforePeriodTransactions = await db.query(
+      'bkash_transactions',
+      where: 'account_id = ? AND created_at < ?',
+      whereArgs: [accountId, startDate.toIso8601String()],
+    );
+
+    double openingBkashBalance = account.bkashBalance;
+    double openingCashBalance = account.cashBalance;
+
+    // Calculate opening balances by reversing all transactions before this period
+    for (final row in beforePeriodTransactions) {
+      final txn = BkashTransaction.fromMap(row);
+      switch (txn.type) {
+        case BkashType.cashIn:
+          openingBkashBalance -= txn.amount;
+          openingCashBalance -= 0;
+          break;
+        case BkashType.cashOut:
+        case BkashType.sendMoney:
+        case BkashType.billPayment:
+          openingBkashBalance += txn.amount;
+          openingCashBalance -= (txn.amount + txn.charge);
+          break;
+        case BkashType.commission:
+          openingCashBalance -= txn.amount;
+          break;
+      }
+    }
+
+    // Get transactions in the period
+    final periodTransactions = await getBkashInRange(startDate, endDate);
+    final accountTransactions = periodTransactions
+        .where((txn) => txn.accountId == accountId)
+        .toList();
+
+    // Sum up transactions by type
+    double totalCashIn = 0;
+    double totalCashOut = 0;
+    double totalSendMoney = 0;
+    double totalBillPayment = 0;
+    double totalCommission = 0;
+
+    for (final txn in accountTransactions) {
+      switch (txn.type) {
+        case BkashType.cashIn:
+          totalCashIn += txn.amount;
+          break;
+        case BkashType.cashOut:
+          totalCashOut += txn.amount;
+          break;
+        case BkashType.sendMoney:
+          totalSendMoney += txn.amount;
+          break;
+        case BkashType.billPayment:
+          totalBillPayment += txn.amount;
+          break;
+        case BkashType.commission:
+          totalCommission += txn.amount;
+          break;
+      }
+    }
+
+    // Calculate closing balance
+    double closingBkashBalance = openingBkashBalance;
+    double closingCashBalance = openingCashBalance;
+
+    for (final txn in accountTransactions) {
+      switch (txn.type) {
+        case BkashType.cashIn:
+          closingBkashBalance += txn.amount;
+          closingCashBalance += 0;
+          break;
+        case BkashType.cashOut:
+        case BkashType.sendMoney:
+        case BkashType.billPayment:
+          closingBkashBalance -= txn.amount;
+          closingCashBalance += (txn.amount + txn.charge);
+          break;
+        case BkashType.commission:
+          closingCashBalance += txn.amount;
+          break;
+      }
+    }
+
+    final netChange =
+        (closingBkashBalance - openingBkashBalance) +
+        (closingCashBalance - openingCashBalance);
+
+    return BkashReportSummary(
+      period: period,
+      startDate: startDate,
+      endDate: endDate,
+      accountName: account.name,
+      accountId: accountId,
+      openingBkashBalance: openingBkashBalance,
+      openingCashBalance: openingCashBalance,
+      closingBkashBalance: closingBkashBalance,
+      closingCashBalance: closingCashBalance,
+      totalCashIn: totalCashIn,
+      totalCashOut: totalCashOut,
+      totalSendMoney: totalSendMoney,
+      totalBillPayment: totalBillPayment,
+      totalCommission: totalCommission,
+      netChange: netChange,
+    );
+  }
+
+  Future<List<BkashReportSummary>> getAllAccountsDailyReport({
+    required DateTime date,
+  }) async {
+    final accounts = await getBkashAccounts();
+    final reports = <BkashReportSummary>[];
+
+    for (final account in accounts) {
+      final report = await getBkashDailyReport(
+        accountId: account.id,
+        date: date,
+      );
+      if (report != null) {
+        reports.add(report);
+      }
+    }
+
+    return reports;
+  }
+
+  Future<List<BkashReportSummary>> getAllAccountsWeeklyReport({
+    required DateTime date,
+  }) async {
+    final accounts = await getBkashAccounts();
+    final reports = <BkashReportSummary>[];
+
+    for (final account in accounts) {
+      final report = await getBkashWeeklyReport(
+        accountId: account.id,
+        date: date,
+      );
+      if (report != null) {
+        reports.add(report);
+      }
+    }
+
+    return reports;
+  }
+
+  Future<List<BkashReportSummary>> getAllAccountsMonthlyReport({
+    required int year,
+    required int month,
+  }) async {
+    final accounts = await getBkashAccounts();
+    final reports = <BkashReportSummary>[];
+
+    for (final account in accounts) {
+      final report = await getBkashMonthlyReport(
+        accountId: account.id,
+        year: year,
+        month: month,
+      );
+      if (report != null) {
+        reports.add(report);
+      }
+    }
+
+    return reports;
+  }
+
+  Future<List<BkashReportSummary>> getAllAccountsYearlyReport({
+    required int year,
+  }) async {
+    final accounts = await getBkashAccounts();
+    final reports = <BkashReportSummary>[];
+
+    for (final account in accounts) {
+      final report = await getBkashYearlyReport(
+        accountId: account.id,
+        year: year,
+      );
+      if (report != null) {
+        reports.add(report);
+      }
+    }
+
+    return reports;
+  }
+
+  Future<List<BkashReportSummary>> getBkashDailyReportRange({
+    required String accountId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    final reports = <BkashReportSummary>[];
+    var currentDate = DateTime(startDate.year, startDate.month, startDate.day);
+    final lastDate = DateTime(endDate.year, endDate.month, endDate.day);
+
+    while (currentDate.isBefore(lastDate) ||
+        currentDate.isAtSameMomentAs(lastDate)) {
+      final report = await getBkashDailyReport(
+        accountId: accountId,
+        date: currentDate,
+      );
+      if (report != null) {
+        reports.add(report);
+      }
+      currentDate = currentDate.add(const Duration(days: 1));
+    }
+
+    return reports;
+  }
+
+  Future<List<BkashReportSummary>> getBkashMonthlyReportRange({
+    required String accountId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    final reports = <BkashReportSummary>[];
+    var year = startDate.year;
+    var month = startDate.month;
+
+    while (year < endDate.year ||
+        (year == endDate.year && month <= endDate.month)) {
+      final report = await getBkashMonthlyReport(
+        accountId: accountId,
+        year: year,
+        month: month,
+      );
+      if (report != null) {
+        reports.add(report);
+      }
+
+      if (month == 12) {
+        year++;
+        month = 1;
+      } else {
+        month++;
+      }
+    }
+
+    return reports;
+  }
+
+  Future<List<BkashReportSummary>> getBkashYearlyReportRange({
+    required String accountId,
+    required int startYear,
+    required int endYear,
+  }) async {
+    final reports = <BkashReportSummary>[];
+
+    for (var year = startYear; year <= endYear; year++) {
+      final report = await getBkashYearlyReport(
+        accountId: accountId,
+        year: year,
+      );
+      if (report != null) {
+        reports.add(report);
+      }
+    }
+
+    return reports;
+  }
+
+  Future<List<BkashReportSummary>> getBkashWeeklyReportRange({
+    required String accountId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    final reports = <BkashReportSummary>[];
+    var currentDate = startDate;
+
+    while (currentDate.isBefore(endDate)) {
+      final report = await getBkashWeeklyReport(
+        accountId: accountId,
+        date: currentDate,
+      );
+      if (report != null) {
+        reports.add(report);
+      }
+      currentDate = currentDate.add(const Duration(days: 7));
+    }
+
+    return reports;
+  }
+
+  Future<List<BkashReportSummary>> getAllBkashDailyReportRange({
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    final reports = <BkashReportSummary>[];
+    var currentDate = DateTime(startDate.year, startDate.month, startDate.day);
+    final lastDate = DateTime(endDate.year, endDate.month, endDate.day);
+
+    while (currentDate.isBefore(lastDate) ||
+        currentDate.isAtSameMomentAs(lastDate)) {
+      final dailyReports = await getAllAccountsDailyReport(date: currentDate);
+      reports.addAll(dailyReports);
+      currentDate = currentDate.add(const Duration(days: 1));
+    }
+
+    return reports;
+  }
+
+  Future<List<BkashReportSummary>> getAllBkashMonthlyReportRange({
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    final reports = <BkashReportSummary>[];
+    var year = startDate.year;
+    var month = startDate.month;
+
+    while (year < endDate.year ||
+        (year == endDate.year && month <= endDate.month)) {
+      final monthlyReports = await getAllAccountsMonthlyReport(
+        year: year,
+        month: month,
+      );
+      reports.addAll(monthlyReports);
+
+      if (month == 12) {
+        year++;
+        month = 1;
+      } else {
+        month++;
+      }
+    }
+
+    return reports;
   }
 
   Future<List<InventoryAdjustment>> getInventoryAdjustmentsInRange(

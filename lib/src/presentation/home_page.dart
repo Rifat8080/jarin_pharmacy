@@ -33,6 +33,8 @@ String _bkashTypeLabel(BkashType type) {
   return switch (type) {
     BkashType.cashIn => 'Cash In',
     BkashType.cashOut => 'Cash Out',
+    BkashType.sendMoney => 'Send Money',
+    BkashType.billPayment => 'Bill Payment',
     BkashType.commission => 'Commission',
   };
 }
@@ -3088,7 +3090,279 @@ class _BkashTab extends StatefulWidget {
 }
 
 class _BkashTabState extends State<_BkashTab> {
+  static const List<BkashType> _transactionTypes = [
+    BkashType.cashIn,
+    BkashType.cashOut,
+    BkashType.sendMoney,
+    BkashType.billPayment,
+  ];
+
+  String? _selectedAccountId;
+  bool _showReports = false;
+  String _reportPeriod = 'daily'; // daily, weekly, monthly, yearly
+  DateTime _selectedDate = DateTime.now();
+
+  void _ensureSelectedAccount() {
+    final accounts = widget.controller.bkashAccounts;
+    if (accounts.isEmpty) {
+      _selectedAccountId = null;
+      return;
+    }
+
+    final exists = accounts.any((account) => account.id == _selectedAccountId);
+    if (!exists) {
+      _selectedAccountId = accounts.first.id;
+    }
+  }
+
+  Future<void> _showAddAccountDialog() async {
+    final nameController = TextEditingController();
+    final bkashBalanceController = TextEditingController(text: '0');
+    final cashBalanceController = TextEditingController(text: '0');
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Add bKash Account'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Account Name'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: bkashBalanceController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Current bKash Balance',
+                    prefixText: '৳ ',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: cashBalanceController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Current Cash Balance',
+                    prefixText: '৳ ',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    final name = nameController.text.trim();
+    final openingBkash = double.tryParse(bkashBalanceController.text.trim());
+    final openingCash = double.tryParse(cashBalanceController.text.trim());
+
+    if (name.isEmpty || openingBkash == null || openingCash == null) {
+      return;
+    }
+
+    try {
+      await widget.controller.addBkashAccount(
+        name: name,
+        openingBkashBalance: openingBkash,
+        openingCashBalance: openingCash,
+      );
+      if (!mounted) {
+        return;
+      }
+      final account = widget.controller.bkashAccounts.firstWhere(
+        (item) => item.name == name,
+        orElse: () => widget.controller.bkashAccounts.first,
+      );
+      setState(() {
+        _selectedAccountId = account.id;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to add account: $error')));
+    }
+  }
+
+  Future<void> _showEditAccountDialog(BkashAccount account) async {
+    final nameController = TextEditingController(text: account.name);
+    final bkashBalanceController = TextEditingController(
+      text: account.bkashBalance.toString(),
+    );
+    final cashBalanceController = TextEditingController(
+      text: account.cashBalance.toString(),
+    );
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Edit bKash Account'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Account Name'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: bkashBalanceController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'bKash Balance',
+                    prefixText: '৳ ',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: cashBalanceController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Cash Balance',
+                    prefixText: '৳ ',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    final name = nameController.text.trim();
+    final bkash = double.tryParse(bkashBalanceController.text.trim());
+    final cash = double.tryParse(cashBalanceController.text.trim());
+
+    if (name.isEmpty || bkash == null || cash == null) {
+      return;
+    }
+
+    try {
+      await widget.controller.updateBkashAccount(
+        accountId: account.id,
+        name: name,
+        bkashBalance: bkash,
+        cashBalance: cash,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _selectedAccountId = account.id;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update account: $error')),
+      );
+    }
+  }
+
+  Future<void> _showDeleteAccountDialog(BkashAccount account) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete Account'),
+          content: Text(
+            'Are you sure you want to delete "${account.name}"? This action cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    try {
+      await widget.controller.deleteBkashAccount(account.id);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _selectedAccountId = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Account deleted successfully')),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete account: $error')),
+      );
+    }
+  }
+
   Future<void> _showBkashDialog() async {
+    final accounts = widget.controller.bkashAccounts;
+    if (accounts.isEmpty) {
+      await _showAddAccountDialog();
+      return;
+    }
+
+    var selectedAccountId = _selectedAccountId ?? accounts.first.id;
     final amountController = TextEditingController();
     final chargeController = TextEditingController(text: '0');
     final noteController = TextEditingController();
@@ -3105,10 +3379,31 @@ class _BkashTabState extends State<_BkashTab> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedAccountId,
+                      decoration: const InputDecoration(labelText: 'Account'),
+                      items: accounts
+                          .map(
+                            (account) => DropdownMenuItem<String>(
+                              value: account.id,
+                              child: Text(account.name),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        if (value == null) {
+                          return;
+                        }
+                        setStateDialog(() {
+                          selectedAccountId = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
                     DropdownButtonFormField<BkashType>(
                       initialValue: selectedType,
                       decoration: const InputDecoration(labelText: 'Type'),
-                      items: BkashType.values
+                      items: _transactionTypes
                           .map(
                             (type) => DropdownMenuItem<BkashType>(
                               value: type,
@@ -3185,6 +3480,7 @@ class _BkashTabState extends State<_BkashTab> {
 
     try {
       await widget.controller.recordBkash(
+        accountId: selectedAccountId,
         type: selectedType,
         amount: amount,
         charge: charge,
@@ -3192,6 +3488,12 @@ class _BkashTabState extends State<_BkashTab> {
             ? null
             : noteController.text.trim(),
       );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _selectedAccountId = selectedAccountId;
+      });
     } catch (error) {
       if (!mounted) {
         return;
@@ -3240,9 +3542,417 @@ class _BkashTabState extends State<_BkashTab> {
     }
   }
 
+  Future<void> _showDatePickerDialog(String period) async {
+    final now = DateTime.now();
+    DateTime? selectedDate;
+
+    if (period == 'daily') {
+      selectedDate = await showDatePicker(
+        context: context,
+        initialDate: _selectedDate,
+        firstDate: DateTime(2020),
+        lastDate: now,
+      );
+    } else if (period == 'monthly') {
+      selectedDate = await showDatePicker(
+        context: context,
+        initialDate: _selectedDate,
+        firstDate: DateTime(2020),
+        lastDate: now,
+      );
+    } else if (period == 'yearly') {
+      selectedDate = await showDatePicker(
+        context: context,
+        initialDate: _selectedDate,
+        firstDate: DateTime(2020),
+        lastDate: now,
+      );
+    } else if (period == 'weekly') {
+      selectedDate = await showDatePicker(
+        context: context,
+        initialDate: _selectedDate,
+        firstDate: DateTime(2020),
+        lastDate: now,
+      );
+    }
+
+    if (selectedDate == null) {
+      return;
+    }
+
+    setState(() {
+      _selectedDate = selectedDate!;
+    });
+  }
+
+  Widget _buildReportSummaryCard(BkashReportSummary report) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        report.accountName,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${DateFormat('dd MMM yyyy').format(report.startDate)} - ${DateFormat('dd MMM yyyy').format(report.endDate)}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                Chip(
+                  label: Text(report.period),
+                  backgroundColor: Colors.blue.shade100,
+                ),
+              ],
+            ),
+            const Divider(height: 16),
+            // Current Cash Balance
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                border: Border.all(color: Colors.green.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Current Cash Balance',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.green.shade700,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _money(report.closingCashBalance),
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: Colors.green.shade900,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Opening Balances
+            Text(
+              'Opening Balance',
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('bKash: ${_money(report.openingBkashBalance)}'),
+                Text('Cash: ${_money(report.openingCashBalance)}'),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // Transaction Summary
+            Text(
+              'Transactions',
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            _buildTransactionRow('Cash In', report.totalCashIn, Colors.green),
+            _buildTransactionRow('Cash Out', report.totalCashOut, Colors.red),
+            _buildTransactionRow(
+              'Send Money',
+              report.totalSendMoney,
+              Colors.orange,
+            ),
+            _buildTransactionRow(
+              'Bill Payment',
+              report.totalBillPayment,
+              Colors.blue,
+            ),
+            _buildTransactionRow(
+              'Commission',
+              report.totalCommission,
+              Colors.purple,
+            ),
+            const Divider(height: 12),
+            // Closing Balances
+            Text(
+              'Closing Balance',
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'bKash: ${_money(report.closingBkashBalance)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  'Cash: ${_money(report.closingCashBalance)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Net Change
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Net Change',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    _money(report.netChange),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: report.netChange >= 0 ? Colors.green : Colors.red,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTransactionRow(String label, double amount, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label),
+          Text(
+            _money(amount),
+            style: TextStyle(color: color, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReportsView() {
+    final accounts = widget.controller.bkashAccounts;
+    if (accounts.isEmpty) {
+      return const Center(child: Text('No accounts available for reports'));
+    }
+
+    return FutureBuilder<BkashReportSummary?>(
+      future: _fetchReport(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+
+        if (!snapshot.hasData || snapshot.data == null) {
+          return const Center(child: Text('No report data available'));
+        }
+
+        return ListView(
+          padding: const EdgeInsets.all(8),
+          children: [_buildReportSummaryCard(snapshot.data!)],
+        );
+      },
+    );
+  }
+
+  Future<BkashReportSummary?> _fetchReport() async {
+    final selectedAccount = widget.controller.bkashAccounts.firstWhere(
+      (account) => account.id == _selectedAccountId,
+      orElse: () => widget.controller.bkashAccounts.first,
+    );
+
+    switch (_reportPeriod) {
+      case 'daily':
+        return widget.controller.getBkashDailyReport(
+          accountId: selectedAccount.id,
+          date: _selectedDate,
+        );
+      case 'weekly':
+        return widget.controller.getBkashWeeklyReport(
+          accountId: selectedAccount.id,
+          date: _selectedDate,
+        );
+      case 'monthly':
+        return widget.controller.getBkashMonthlyReport(
+          accountId: selectedAccount.id,
+          year: _selectedDate.year,
+          month: _selectedDate.month,
+        );
+      case 'yearly':
+        return widget.controller.getBkashYearlyReport(
+          accountId: selectedAccount.id,
+          year: _selectedDate.year,
+        );
+      default:
+        return null;
+    }
+  }
+
+  String _getDateLabel() {
+    switch (_reportPeriod) {
+      case 'daily':
+        return DateFormat('dd MMM yyyy').format(_selectedDate);
+      case 'weekly':
+        final startOfWeek = _selectedDate.subtract(
+          Duration(days: _selectedDate.weekday - 1),
+        );
+        final endOfWeek = startOfWeek.add(const Duration(days: 6));
+        return '${DateFormat('dd MMM').format(startOfWeek)} - ${DateFormat('dd MMM yyyy').format(endOfWeek)}';
+      case 'monthly':
+        return DateFormat('MMMM yyyy').format(_selectedDate);
+      case 'yearly':
+        return _selectedDate.year.toString();
+      default:
+        return '';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final report = widget.controller.dashboardReport;
+    _ensureSelectedAccount();
+
+    final accounts = widget.controller.bkashAccounts;
+    final selectedAccount = accounts.isEmpty
+        ? null
+        : accounts.firstWhere(
+            (account) => account.id == _selectedAccountId,
+            orElse: () => accounts.first,
+          );
+
+    if (_showReports) {
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() => _showReports = false);
+                  },
+                  icon: const Icon(Icons.arrow_back),
+                  label: const Text('Back to Transactions'),
+                ),
+                const Spacer(),
+                FilledButton.icon(
+                  onPressed: () => _showDatePickerDialog(_reportPeriod),
+                  icon: const Icon(Icons.calendar_today),
+                  label: Text(_getDateLabel()),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              children: [
+                FilterChip(
+                  label: const Text('Daily'),
+                  selected: _reportPeriod == 'daily',
+                  onSelected: (_) {
+                    setState(() => _reportPeriod = 'daily');
+                  },
+                ),
+                FilterChip(
+                  label: const Text('Weekly'),
+                  selected: _reportPeriod == 'weekly',
+                  onSelected: (_) {
+                    setState(() => _reportPeriod = 'weekly');
+                  },
+                ),
+                FilterChip(
+                  label: const Text('Monthly'),
+                  selected: _reportPeriod == 'monthly',
+                  onSelected: (_) {
+                    setState(() => _reportPeriod = 'monthly');
+                  },
+                ),
+                FilterChip(
+                  label: const Text('Yearly'),
+                  selected: _reportPeriod == 'yearly',
+                  onSelected: (_) {
+                    setState(() => _reportPeriod = 'yearly');
+                  },
+                ),
+              ],
+            ),
+            if (accounts.isNotEmpty) const SizedBox(height: 12),
+            if (accounts.isNotEmpty)
+              DropdownButtonFormField<String>(
+                initialValue: _selectedAccountId,
+                decoration: const InputDecoration(labelText: 'Account'),
+                items: accounts
+                    .map(
+                      (account) => DropdownMenuItem<String>(
+                        value: account.id,
+                        child: Text(account.name),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value == null) {
+                    return;
+                  }
+                  setState(() {
+                    _selectedAccountId = value;
+                  });
+                },
+              ),
+            if (accounts.isNotEmpty) const SizedBox(height: 12),
+            Expanded(
+              child: accounts.isEmpty
+                  ? const _EmptyStateCard(
+                      title: 'No bKash accounts',
+                      message: 'Create accounts to view reports.',
+                    )
+                  : _buildReportsView(),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Original transactions view
+    final transactions = selectedAccount == null
+        ? <BkashTransaction>[]
+        : widget.controller.bkashTransactions
+              .where((item) => item.accountId == selectedAccount.id)
+              .toList();
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -3251,35 +3961,97 @@ class _BkashTabState extends State<_BkashTab> {
         children: [
           Row(
             children: [
+              OutlinedButton.icon(
+                onPressed: _showAddAccountDialog,
+                icon: const Icon(Icons.account_balance_wallet_outlined),
+                label: const Text('Add Account'),
+              ),
+              const SizedBox(width: 8),
               FilledButton.icon(
                 onPressed: _showBkashDialog,
                 icon: const Icon(Icons.add),
                 label: const Text('Record bKash'),
               ),
+              const SizedBox(width: 8),
+              FilledButton.icon(
+                onPressed: () {
+                  setState(() => _showReports = true);
+                },
+                icon: const Icon(Icons.assessment_outlined),
+                label: const Text('Reports'),
+              ),
               const SizedBox(width: 16),
-              if (report != null)
+              if (selectedAccount != null)
                 Expanded(
                   child: Text(
-                    'In ${_money(report.bkashIn)} • Out ${_money(report.bkashOut)} • Commission ${_money(report.bkashCommission)}',
+                    '${selectedAccount.name} • bKash ${_money(selectedAccount.bkashBalance)} • Cash ${_money(selectedAccount.cashBalance)}',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ),
             ],
           ),
           const SizedBox(height: 12),
+          if (accounts.isNotEmpty)
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _selectedAccountId,
+                    decoration: const InputDecoration(
+                      labelText: 'View Account',
+                    ),
+                    items: accounts
+                        .map(
+                          (account) => DropdownMenuItem<String>(
+                            value: account.id,
+                            child: Text(account.name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null) {
+                        return;
+                      }
+                      setState(() {
+                        _selectedAccountId = value;
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (selectedAccount != null)
+                  IconButton(
+                    icon: const Icon(Icons.edit),
+                    tooltip: 'Edit account',
+                    onPressed: () => _showEditAccountDialog(selectedAccount),
+                  ),
+                if (selectedAccount != null)
+                  IconButton(
+                    icon: const Icon(Icons.delete),
+                    tooltip: 'Delete account',
+                    onPressed: () => _showDeleteAccountDialog(selectedAccount),
+                  ),
+              ],
+            ),
+          if (accounts.isNotEmpty) const SizedBox(height: 12),
           Expanded(
-            child: widget.controller.bkashTransactions.isEmpty
+            child: accounts.isEmpty
+                ? const _EmptyStateCard(
+                    title: 'No bKash accounts',
+                    message:
+                        'Create bKash accounts with current balances to start recording transactions.',
+                  )
+                : transactions.isEmpty
                 ? const _EmptyStateCard(
                     title: 'No bKash entries',
                     message:
-                        'Record bKash cash-in, cash-out, and commissions here.',
+                        'Record Cash In, Cash Out, Send Money, and Bill Payment for this account.',
                   )
                 : ListView.separated(
-                    itemCount: widget.controller.bkashTransactions.length,
+                    itemCount: transactions.length,
                     separatorBuilder: (_, _) => const SizedBox(height: 4),
                     itemBuilder: (context, index) {
-                      final transaction =
-                          widget.controller.bkashTransactions[index];
+                      final transaction = transactions[index];
                       return Card(
                         child: ListTile(
                           title: Text(_bkashTypeLabel(transaction.type)),

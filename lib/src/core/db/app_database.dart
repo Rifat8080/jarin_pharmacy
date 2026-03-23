@@ -7,10 +7,12 @@ class AppDatabase {
 
   static final AppDatabase instance = AppDatabase._();
   static const Uuid _uuid = Uuid();
+  static const String primaryBkashAccountId = 'bkash-account-primary';
+  static const String primaryBkashAccountName = 'Primary bKash';
   static const String walkInCustomerId = 'customer-walkin-default';
   static const String walkInCustomerName = 'Walk-in customer';
   static const String _databaseName = 'jarin_pharmacy.db';
-  static const int _databaseVersion = 10;
+  static const int _databaseVersion = 11;
 
   Database? _database;
   Future<Database>? _openingDatabase;
@@ -92,6 +94,84 @@ class AppDatabase {
     if (oldVersion < 10) {
       await _migrateProductDgdaColumns(db);
     }
+    if (oldVersion < 11) {
+      await _migrateBkashAccounts(db);
+    }
+  }
+
+  Future<void> _migrateBkashAccounts(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS bkash_accounts(
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        bkash_balance REAL NOT NULL DEFAULT 0,
+        cash_balance REAL NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      )
+    ''');
+
+    await db
+        .execute(
+          'ALTER TABLE bkash_transactions ADD COLUMN account_id TEXT REFERENCES bkash_accounts(id)',
+        )
+        .catchError((_) {});
+
+    await db.insert('bkash_accounts', {
+      'id': primaryBkashAccountId,
+      'name': primaryBkashAccountName,
+      'bkash_balance': 0,
+      'cash_balance': 0,
+      'created_at': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
+
+    final legacy = await db.query(
+      'bkash_transactions',
+      columns: ['id', 'type', 'amount', 'charge', 'account_id'],
+      where: 'account_id IS NULL OR account_id = ?',
+      whereArgs: [''],
+    );
+
+    double deltaBkash = 0;
+    double deltaCash = 0;
+    for (final row in legacy) {
+      final type = row['type'] as String;
+      final amount = (row['amount'] as num).toDouble();
+      final charge = (row['charge'] as num).toDouble();
+
+      switch (type) {
+        case 'cashIn':
+          deltaBkash += amount;
+          deltaCash += 0;
+          break;
+        case 'sendMoney':
+        case 'billPayment':
+          deltaBkash -= amount;
+          deltaCash += amount + charge;
+          break;
+        case 'cashOut':
+          deltaBkash -= amount;
+          deltaCash += amount + charge;
+          break;
+        case 'commission':
+        default:
+          deltaCash += amount;
+          break;
+      }
+
+      await db.update(
+        'bkash_transactions',
+        {'account_id': primaryBkashAccountId},
+        where: 'id = ?',
+        whereArgs: [row['id']],
+      );
+    }
+
+    await db.rawUpdate(
+      'UPDATE bkash_accounts SET bkash_balance = bkash_balance + ?, cash_balance = cash_balance + ? WHERE id = ?',
+      [deltaBkash, deltaCash, primaryBkashAccountId],
+    );
+
+    await _createIndexes(db);
   }
 
   Future<void> _migrateProductDgdaColumns(Database db) async {
@@ -557,6 +637,7 @@ class AppDatabase {
       for (final row in legacyBkashTransactions) {
         await txn.insert('bkash_transactions', {
           'id': _uuid.v4(),
+          'account_id': primaryBkashAccountId,
           'type': row['type'],
           'amount': row['amount'],
           'charge': row['charge'],
@@ -684,14 +765,34 @@ class AppDatabase {
     ''');
 
     await db.execute('''
+      CREATE TABLE IF NOT EXISTS bkash_accounts(
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        bkash_balance REAL NOT NULL DEFAULT 0,
+        cash_balance REAL NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      )
+    ''');
+
+    await db.insert('bkash_accounts', {
+      'id': primaryBkashAccountId,
+      'name': primaryBkashAccountName,
+      'bkash_balance': 0,
+      'cash_balance': 0,
+      'created_at': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
+
+    await db.execute('''
       CREATE TABLE IF NOT EXISTS bkash_transactions(
         id TEXT PRIMARY KEY,
+        account_id TEXT NOT NULL,
         type TEXT NOT NULL,
         amount REAL NOT NULL,
         charge REAL NOT NULL,
         net_amount REAL NOT NULL,
         created_at TEXT NOT NULL,
-        note TEXT
+        note TEXT,
+        FOREIGN KEY(account_id) REFERENCES bkash_accounts(id)
       )
     ''');
 
@@ -748,6 +849,9 @@ class AppDatabase {
     );
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_bkash_created_at ON bkash_transactions(created_at)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_bkash_account_created_at ON bkash_transactions(account_id, created_at)',
     );
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_inventory_adjustments_product_created_at ON inventory_adjustments(product_id, created_at)',

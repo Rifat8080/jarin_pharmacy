@@ -2,7 +2,7 @@ import 'dart:convert';
 
 enum ProductCategory { medicine, stationery }
 
-enum BkashType { cashIn, cashOut, commission }
+enum BkashType { cashIn, cashOut, sendMoney, billPayment, commission }
 
 enum ReportPeriod { day, month, year }
 
@@ -523,9 +523,46 @@ class CustomerDueSummary {
   final double totalPaid;
 }
 
+class BkashAccount {
+  const BkashAccount({
+    required this.id,
+    required this.name,
+    required this.bkashBalance,
+    required this.cashBalance,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String name;
+  final double bkashBalance;
+  final double cashBalance;
+  final DateTime createdAt;
+
+  Map<String, Object?> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'bkash_balance': bkashBalance,
+      'cash_balance': cashBalance,
+      'created_at': createdAt.toIso8601String(),
+    };
+  }
+
+  factory BkashAccount.fromMap(Map<String, Object?> map) {
+    return BkashAccount(
+      id: map['id'] as String,
+      name: map['name'] as String,
+      bkashBalance: (map['bkash_balance'] as num).toDouble(),
+      cashBalance: (map['cash_balance'] as num).toDouble(),
+      createdAt: DateTime.parse(map['created_at'] as String),
+    );
+  }
+}
+
 class BkashTransaction {
   const BkashTransaction({
     required this.id,
+    required this.accountId,
     required this.type,
     required this.amount,
     required this.charge,
@@ -535,6 +572,7 @@ class BkashTransaction {
   });
 
   final String? id;
+  final String accountId;
   final BkashType type;
   final double amount;
   final double charge;
@@ -545,6 +583,7 @@ class BkashTransaction {
   Map<String, Object?> toMap() {
     return {
       'id': id,
+      'account_id': accountId,
       'type': type.name,
       'amount': amount,
       'charge': charge,
@@ -557,6 +596,7 @@ class BkashTransaction {
   factory BkashTransaction.fromMap(Map<String, Object?> map) {
     return BkashTransaction(
       id: map['id'] as String,
+      accountId: (map['account_id'] as String?) ?? 'bkash-account-primary',
       type: BkashType.values.byName(map['type'] as String),
       amount: (map['amount'] as num).toDouble(),
       charge: (map['charge'] as num).toDouble(),
@@ -564,6 +604,52 @@ class BkashTransaction {
       createdAt: DateTime.parse(map['created_at'] as String),
       note: map['note'] as String?,
     );
+  }
+}
+
+class BkashReportSummary {
+  const BkashReportSummary({
+    required this.period,
+    required this.startDate,
+    required this.endDate,
+    required this.accountName,
+    required this.accountId,
+    required this.openingBkashBalance,
+    required this.openingCashBalance,
+    required this.closingBkashBalance,
+    required this.closingCashBalance,
+    required this.totalCashIn,
+    required this.totalCashOut,
+    required this.totalSendMoney,
+    required this.totalBillPayment,
+    required this.totalCommission,
+    required this.netChange,
+  });
+
+  final String period;
+  final DateTime startDate;
+  final DateTime endDate;
+  final String accountName;
+  final String accountId;
+  final double openingBkashBalance;
+  final double openingCashBalance;
+  final double closingBkashBalance;
+  final double closingCashBalance;
+  final double totalCashIn;
+  final double totalCashOut;
+  final double totalSendMoney;
+  final double totalBillPayment;
+  final double totalCommission;
+  final double netChange;
+
+  double get totalInflow => totalCashIn + totalCommission;
+  double get totalOutflow => totalCashOut + totalSendMoney + totalBillPayment;
+
+  @override
+  String toString() {
+    return 'BkashReportSummary(period: $period, account: $accountName, '
+        'opening: bKash ${openingBkashBalance.toStringAsFixed(2)}/Cash ${openingCashBalance.toStringAsFixed(2)}, '
+        'closing: bKash ${closingBkashBalance.toStringAsFixed(2)}/Cash ${closingCashBalance.toStringAsFixed(2)})';
   }
 }
 

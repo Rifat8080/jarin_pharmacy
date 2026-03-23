@@ -41,6 +41,7 @@ class PharmacyAppController extends ChangeNotifier {
   List<Customer> customers = const [];
   Map<String, CustomerDueSummary> customerDueSummaries = const {};
   List<BkashTransaction> bkashTransactions = const [];
+  List<BkashAccount> bkashAccounts = const [];
   List<InventoryAdjustment> adjustments = const [];
   List<DgdaMedicine> dgdaMedicines = const [];
 
@@ -112,6 +113,7 @@ class PharmacyAppController extends ChangeNotifier {
           reportWindow!.start,
           reportWindow!.end,
         );
+        bkashAccounts = await _transactions.getBkashAccounts();
         adjustments = await _transactions.getInventoryAdjustmentsInRange(
           reportWindow!.start,
           reportWindow!.end,
@@ -425,12 +427,14 @@ class PharmacyAppController extends ChangeNotifier {
   }
 
   Future<void> recordBkash({
+    required String accountId,
     required BkashType type,
     required double amount,
     required double charge,
     String? note,
   }) async {
     await _transactions.createBkash(
+      accountId: accountId,
       type: type,
       amount: amount,
       charge: charge,
@@ -442,6 +446,7 @@ class PharmacyAppController extends ChangeNotifier {
 
   Future<void> updateBkash({
     required String bkashId,
+    required String accountId,
     required BkashType type,
     required double amount,
     required double charge,
@@ -449,6 +454,7 @@ class PharmacyAppController extends ChangeNotifier {
   }) async {
     await _transactions.updateBkash(
       bkashId: bkashId,
+      accountId: accountId,
       type: type,
       amount: amount,
       charge: charge,
@@ -460,5 +466,165 @@ class PharmacyAppController extends ChangeNotifier {
   Future<void> deleteBkash(String bkashId) async {
     await _transactions.deleteBkash(bkashId);
     await refreshAll();
+  }
+
+  Future<void> addBkashAccount({
+    required String name,
+    required double openingBkashBalance,
+    required double openingCashBalance,
+  }) async {
+    await _transactions.createBkashAccount(
+      name: name,
+      openingBkashBalance: openingBkashBalance,
+      openingCashBalance: openingCashBalance,
+    );
+    await refreshAll();
+  }
+
+  Future<void> updateBkashAccount({
+    required String accountId,
+    required String name,
+    required double bkashBalance,
+    required double cashBalance,
+  }) async {
+    await _transactions.updateBkashAccount(
+      accountId: accountId,
+      name: name,
+      bkashBalance: bkashBalance,
+      cashBalance: cashBalance,
+    );
+    await refreshAll();
+  }
+
+  Future<void> deleteBkashAccount(String accountId) async {
+    await _transactions.deleteBkashAccount(accountId);
+    await refreshAll();
+  }
+
+  // Report methods
+  Future<BkashReportSummary?> getBkashDailyReport({
+    required String accountId,
+    required DateTime date,
+  }) async {
+    return _transactions.getBkashDailyReport(accountId: accountId, date: date);
+  }
+
+  Future<BkashReportSummary?> getBkashWeeklyReport({
+    required String accountId,
+    required DateTime date,
+  }) async {
+    return _transactions.getBkashWeeklyReport(accountId: accountId, date: date);
+  }
+
+  Future<BkashReportSummary?> getBkashMonthlyReport({
+    required String accountId,
+    required int year,
+    required int month,
+  }) async {
+    return _transactions.getBkashMonthlyReport(
+      accountId: accountId,
+      year: year,
+      month: month,
+    );
+  }
+
+  Future<BkashReportSummary?> getBkashYearlyReport({
+    required String accountId,
+    required int year,
+  }) async {
+    return _transactions.getBkashYearlyReport(accountId: accountId, year: year);
+  }
+
+  Future<List<BkashReportSummary>> getAllAccountsDailyReport({
+    required DateTime date,
+  }) async {
+    return _transactions.getAllAccountsDailyReport(date: date);
+  }
+
+  Future<List<BkashReportSummary>> getAllAccountsWeeklyReport({
+    required DateTime date,
+  }) async {
+    return _transactions.getAllAccountsWeeklyReport(date: date);
+  }
+
+  Future<List<BkashReportSummary>> getAllAccountsMonthlyReport({
+    required int year,
+    required int month,
+  }) async {
+    return _transactions.getAllAccountsMonthlyReport(year: year, month: month);
+  }
+
+  Future<List<BkashReportSummary>> getAllAccountsYearlyReport({
+    required int year,
+  }) async {
+    return _transactions.getAllAccountsYearlyReport(year: year);
+  }
+
+  Future<List<BkashReportSummary>> getBkashDailyReportRange({
+    required String accountId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    return _transactions.getBkashDailyReportRange(
+      accountId: accountId,
+      startDate: startDate,
+      endDate: endDate,
+    );
+  }
+
+  Future<List<BkashReportSummary>> getBkashMonthlyReportRange({
+    required String accountId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    return _transactions.getBkashMonthlyReportRange(
+      accountId: accountId,
+      startDate: startDate,
+      endDate: endDate,
+    );
+  }
+
+  Future<List<BkashReportSummary>> getBkashYearlyReportRange({
+    required String accountId,
+    required int startYear,
+    required int endYear,
+  }) async {
+    return _transactions.getBkashYearlyReportRange(
+      accountId: accountId,
+      startYear: startYear,
+      endYear: endYear,
+    );
+  }
+
+  Future<List<BkashReportSummary>> getBkashWeeklyReportRange({
+    required String accountId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    return _transactions.getBkashWeeklyReportRange(
+      accountId: accountId,
+      startDate: startDate,
+      endDate: endDate,
+    );
+  }
+
+  Future<List<BkashReportSummary>> getAllBkashDailyReportRange({
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    return _transactions.getAllBkashDailyReportRange(
+      startDate: startDate,
+      endDate: endDate,
+    );
+  }
+
+  Future<List<BkashReportSummary>> getAllBkashMonthlyReportRange({
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    return _transactions.getAllBkashMonthlyReportRange(
+      startDate: startDate,
+      endDate: endDate,
+    );
   }
 }
