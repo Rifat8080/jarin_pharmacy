@@ -10,7 +10,8 @@ class DgdaDatasetRepository {
   static const String dosageFormAssetPath = 'assets/data/dosage form.csv';
   static const String drugClassAssetPath = 'assets/data/drug class.csv';
   static const String indicationAssetPath = 'assets/data/indication.csv';
-  static const String fallbackSingleAssetPath = 'assets/data/dgda_medicines.csv';
+  static const String fallbackSingleAssetPath =
+      'assets/data/dgda_medicines.csv';
 
   String _normalizeKey(String value) {
     return value
@@ -160,7 +161,10 @@ class DgdaDatasetRepository {
         continue;
       }
 
-      final genericName = _normalizedValue(medicineRow, ['generic_name', 'generic']);
+      final genericName = _normalizedValue(medicineRow, [
+        'generic_name',
+        'generic',
+      ]);
       final manufacturerName = _normalizedValue(medicineRow, [
         'manufacturer_name',
         'manufacturer',
@@ -177,7 +181,8 @@ class DgdaDatasetRepository {
       ]);
 
       final genericRow = genericByName[genericName.toLowerCase()];
-      final manufacturerRow = manufacturerByName[manufacturerName.toLowerCase()];
+      final manufacturerRow =
+          manufacturerByName[manufacturerName.toLowerCase()];
       final dosageRow = dosageByName[dosageFormName.toLowerCase()];
 
       final drugClassName = _normalizedValue(genericRow ?? const {}, [

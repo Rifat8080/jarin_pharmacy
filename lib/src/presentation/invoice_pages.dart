@@ -184,16 +184,17 @@ class _InvoiceDetailsPageState extends ConsumerState<InvoiceDetailsPage> {
     required String title,
     required Map<String, String> data,
   }) async {
-    final entries = data.entries
-        .map(
-          (entry) => MapEntry(
-            _formatInvoiceDgdaFieldLabel(entry.key),
-            _cleanInvoiceDgdaFieldValue(entry.value),
-          ),
-        )
-        .where((entry) => entry.value.isNotEmpty)
-        .toList()
-      ..sort((a, b) => a.key.compareTo(b.key));
+    final entries =
+        data.entries
+            .map(
+              (entry) => MapEntry(
+                _formatInvoiceDgdaFieldLabel(entry.key),
+                _cleanInvoiceDgdaFieldValue(entry.value),
+              ),
+            )
+            .where((entry) => entry.value.isNotEmpty)
+            .toList()
+          ..sort((a, b) => a.key.compareTo(b.key));
 
     await showDialog<void>(
       context: context,
@@ -771,8 +772,8 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                         separatorBuilder: (_, _) => const SizedBox(height: 8),
                         itemBuilder: (context, index) {
                           final customer = filteredCustomers[index];
-                          final summary =
-                              controller.customerDueSummaries[customer.id ?? ''];
+                          final summary = controller
+                              .customerDueSummaries[customer.id ?? ''];
                           final invoiceCount = summary?.invoiceCount ?? 0;
                           final totalDue = summary?.totalDue ?? 0;
                           final totalPaid = summary?.totalPaid ?? 0;
@@ -797,14 +798,16 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                                       fontWeight: FontWeight.w700,
                                       color: totalDue > 0
                                           ? Theme.of(context).colorScheme.error
-                                          : Theme.of(context)
-                                                .colorScheme
-                                                .primary,
+                                          : Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
                                     ),
                                   ),
                                   Text(
                                     'Paid ${_invoiceMoney(totalPaid)}',
-                                    style: Theme.of(context).textTheme.bodySmall,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
                                   ),
                                 ],
                               ),
@@ -826,7 +829,10 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
       return content;
     }
 
-    return Scaffold(appBar: AppBar(title: const Text('Customers')), body: content);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Customers')),
+      body: content,
+    );
   }
 }
 

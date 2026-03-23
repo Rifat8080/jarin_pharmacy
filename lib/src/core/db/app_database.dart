@@ -98,12 +98,12 @@ class AppDatabase {
     await db
         .execute('ALTER TABLE products ADD COLUMN dgda_brand_id TEXT')
         .catchError((_) {});
-    await db.execute('ALTER TABLE products ADD COLUMN dgda_type TEXT').catchError(
-      (_) {},
-    );
-    await db.execute('ALTER TABLE products ADD COLUMN dgda_slug TEXT').catchError(
-      (_) {},
-    );
+    await db
+        .execute('ALTER TABLE products ADD COLUMN dgda_type TEXT')
+        .catchError((_) {});
+    await db
+        .execute('ALTER TABLE products ADD COLUMN dgda_slug TEXT')
+        .catchError((_) {});
     await db
         .execute('ALTER TABLE products ADD COLUMN dgda_generic_name TEXT')
         .catchError((_) {});

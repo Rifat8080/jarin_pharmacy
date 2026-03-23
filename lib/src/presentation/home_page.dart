@@ -1105,16 +1105,17 @@ class _SellTabState extends State<_SellTab> {
     required String title,
     required Map<String, String> data,
   }) async {
-    final entries = data.entries
-        .map(
-          (entry) => MapEntry(
-            _formatDgdaFieldLabel(entry.key),
-            _cleanDgdaFieldValue(entry.value),
-          ),
-        )
-        .where((entry) => entry.value.isNotEmpty)
-        .toList()
-      ..sort((a, b) => a.key.compareTo(b.key));
+    final entries =
+        data.entries
+            .map(
+              (entry) => MapEntry(
+                _formatDgdaFieldLabel(entry.key),
+                _cleanDgdaFieldValue(entry.value),
+              ),
+            )
+            .where((entry) => entry.value.isNotEmpty)
+            .toList()
+          ..sort((a, b) => a.key.compareTo(b.key));
 
     await showDialog<void>(
       context: context,
@@ -1951,7 +1952,9 @@ class _InventoryTabState extends State<_InventoryTab> {
           (product.dgdaManufacturer ?? '').toLowerCase().contains(
             normalizedQuery,
           ) ||
-          (product.dgdaStrength ?? '').toLowerCase().contains(normalizedQuery) ||
+          (product.dgdaStrength ?? '').toLowerCase().contains(
+            normalizedQuery,
+          ) ||
           (product.dgdaDosageForm ?? '').toLowerCase().contains(
             normalizedQuery,
           )) {
@@ -1972,16 +1975,17 @@ class _InventoryTabState extends State<_InventoryTab> {
     required String title,
     required Map<String, String> data,
   }) async {
-    final entries = data.entries
-        .map(
-          (entry) => MapEntry(
-            _formatDgdaFieldLabel(entry.key),
-            _cleanDgdaFieldValue(entry.value),
-          ),
-        )
-        .where((entry) => entry.value.isNotEmpty)
-        .toList()
-      ..sort((a, b) => a.key.compareTo(b.key));
+    final entries =
+        data.entries
+            .map(
+              (entry) => MapEntry(
+                _formatDgdaFieldLabel(entry.key),
+                _cleanDgdaFieldValue(entry.value),
+              ),
+            )
+            .where((entry) => entry.value.isNotEmpty)
+            .toList()
+          ..sort((a, b) => a.key.compareTo(b.key));
 
     await showDialog<void>(
       context: context,
@@ -2088,10 +2092,8 @@ class _InventoryTabState extends State<_InventoryTab> {
                                   subtitle: subtitleParts.isEmpty
                                       ? null
                                       : Text(subtitleParts.join(' • ')),
-                                  onTap: () => Navigator.pop(
-                                    dialogContext,
-                                    medicine,
-                                  ),
+                                  onTap: () =>
+                                      Navigator.pop(dialogContext, medicine),
                                 );
                               },
                             ),

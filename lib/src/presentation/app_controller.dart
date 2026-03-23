@@ -221,21 +221,23 @@ class PharmacyAppController extends ChangeNotifier {
         dgdaType: isMedicine ? (dgdaType ?? existing.dgdaType) : null,
         dgdaSlug: isMedicine ? (dgdaSlug ?? existing.dgdaSlug) : null,
         dgdaGenericName: isMedicine
-          ? (dgdaGenericName ?? existing.dgdaGenericName)
-          : null,
-        dgdaStrength: isMedicine ? (dgdaStrength ?? existing.dgdaStrength) : null,
+            ? (dgdaGenericName ?? existing.dgdaGenericName)
+            : null,
+        dgdaStrength: isMedicine
+            ? (dgdaStrength ?? existing.dgdaStrength)
+            : null,
         dgdaDosageForm: isMedicine
-          ? (dgdaDosageForm ?? existing.dgdaDosageForm)
-          : null,
+            ? (dgdaDosageForm ?? existing.dgdaDosageForm)
+            : null,
         dgdaManufacturer: isMedicine
-          ? (dgdaManufacturer ?? existing.dgdaManufacturer)
-          : null,
+            ? (dgdaManufacturer ?? existing.dgdaManufacturer)
+            : null,
         dgdaPackageContainer: isMedicine
-          ? (dgdaPackageContainer ?? existing.dgdaPackageContainer)
-          : null,
+            ? (dgdaPackageContainer ?? existing.dgdaPackageContainer)
+            : null,
         dgdaPackageSize: isMedicine
-          ? (dgdaPackageSize ?? existing.dgdaPackageSize)
-          : null,
+            ? (dgdaPackageSize ?? existing.dgdaPackageSize)
+            : null,
         dgdaData: isMedicine
             ? (dgdaData ?? existing.dgdaData)
             : const <String, String>{},
