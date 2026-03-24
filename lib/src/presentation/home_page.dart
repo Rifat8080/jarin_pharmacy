@@ -11,8 +11,7 @@ import 'invoice_pages.dart';
 
 const int _lowStockThreshold = 10;
 const int _criticalStockThreshold = 3;
-const double _desktopMaxContentWidth = 1480;
-const Duration _microAnimationDuration = Duration(milliseconds: 140);
+const Duration _microAnimationDuration = Duration(milliseconds: 90);
 
 String _money(num value) {
   return NumberFormat.currency(symbol: '৳', decimalDigits: 2).format(value);
@@ -41,7 +40,6 @@ String _bkashTypeLabel(BkashType type) {
 
 String _stockDisplay(Product product) {
   if (product.trackInPieces &&
-      product.category == ProductCategory.medicine &&
       product.unitsPerPack > 1) {
     final packs = product.stockQty ~/ product.unitsPerPack;
     final pieces = product.stockQty % product.unitsPerPack;
@@ -52,7 +50,6 @@ String _stockDisplay(Product product) {
 
 String _stockShortDisplay(Product product) {
   if (product.trackInPieces &&
-      product.category == ProductCategory.medicine &&
       product.unitsPerPack > 1) {
     final packs = product.stockQty ~/ product.unitsPerPack;
     final pieces = product.stockQty % product.unitsPerPack;
@@ -63,7 +60,6 @@ String _stockShortDisplay(Product product) {
 
 String _quantityDisplay(Product product, int quantity) {
   if (product.trackInPieces &&
-      product.category == ProductCategory.medicine &&
       product.unitsPerPack > 1) {
     final packs = quantity ~/ product.unitsPerPack;
     final pieces = quantity % product.unitsPerPack;
@@ -78,7 +74,6 @@ String _deltaQuantityDisplay(Product? product, int deltaQuantity) {
 
   if (product != null &&
       product.trackInPieces &&
-      product.category == ProductCategory.medicine &&
       product.unitsPerPack > 1) {
     final packs = absolute ~/ product.unitsPerPack;
     final pieces = absolute % product.unitsPerPack;
@@ -234,18 +229,6 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
     };
   }
 
-  String get _activeTabSubtitle {
-    return switch (_selectedTab) {
-      0 => 'Offline Smart POS',
-      1 => 'Create and manage bills',
-      2 => 'Products and inventory records',
-      3 => 'Wallet transactions',
-      4 => 'Business performance overview',
-      5 => 'Customer profiles and dues',
-      _ => 'Offline Smart POS',
-    };
-  }
-
   @override
   void initState() {
     super.initState();
@@ -265,217 +248,473 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
         .where((product) => product.stockQty == 0)
         .length;
 
-    final pages = <Widget>[
-      _DashboardTab(
-        controller: controller,
-        onNavigate: _navigateTo,
-        focusMode: _focusMode,
-      ),
-      _SellTab(controller: controller, focusMode: _focusMode),
-      _InventoryTab(controller: controller, focusMode: _focusMode),
-      _BkashTab(controller: controller),
-      _ReportsTab(controller: controller, onPickDate: _pickReportDate),
-      const CustomerListPage(showScaffold: false),
-    ];
+    final selectedPage = switch (_selectedTab) {
+      0 => _DashboardTab(
+          controller: controller,
+          onNavigate: _navigateTo,
+          focusMode: _focusMode,
+        ),
+      1 => _SellTab(controller: controller, focusMode: _focusMode),
+      2 => _InventoryTab(controller: controller, focusMode: _focusMode),
+      3 => _BkashTab(controller: controller),
+      4 => _ReportsTab(controller: controller, onPickDate: _pickReportDate),
+      5 => const CustomerListPage(showScaffold: false),
+      _ => _DashboardTab(
+          controller: controller,
+          onNavigate: _navigateTo,
+          focusMode: _focusMode,
+        ),
+    };
 
-    return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: 72,
-        title: Column(
-          mainAxisSize: MainAxisSize.min,
+    final scheme = Theme.of(context).colorScheme;
+    final width = MediaQuery.sizeOf(context).width;
+    final useRail = width >= 860;
+    final isWideRail = width >= 1200;
+
+    Widget tabContent = Column(
+      children: [
+        if (controller.errorMessage != null)
+          MaterialBanner(
+            content: Text(controller.errorMessage!),
+            actions: [
+              TextButton(
+                onPressed: controller.refreshAll,
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        Expanded(
+          child: MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: _focusMode
+                  ? const TextScaler.linear(1.08)
+                  : const TextScaler.linear(1),
+            ),
+            child: selectedPage,
+          ),
+        ),
+      ],
+    );
+
+    if (useRail) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFEFF6FF),
+        body: Stack(
           children: [
-            Text(_activeTabTitle),
-            if (!_focusMode)
-              Text(
-                _activeTabSubtitle,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w500,
+            Row(
+              children: [
+                _buildDesktopRail(isWideRail, lowStockCount + outOfStockCount, controller),
+                VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  color: scheme.outlineVariant,
+                ),
+                Expanded(child: tabContent),
+              ],
+            ),
+            if (controller.isLoading)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: ColoredBox(
+                    color: scheme.scrim.withValues(alpha: 0.06),
+                    child: const Center(child: CircularProgressIndicator()),
+                  ),
                 ),
               ),
           ],
         ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Center(
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  setState(() {
-                    _focusMode = !_focusMode;
-                  });
-                },
-                icon: Icon(
-                  _focusMode ? Icons.visibility : Icons.visibility_outlined,
-                  size: 18,
-                ),
-                label: Text(_focusMode ? 'Focus On' : 'Focus Off'),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: Center(
-              child: FilledButton.tonalIcon(
-                onPressed: controller.isLoading ? null : controller.refreshAll,
-                icon: const Icon(Icons.refresh, size: 18),
-                label: const Text('Refresh'),
-              ),
-            ),
-          ),
-        ],
-      ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFEFF6FF),
+      appBar: _buildMobileAppBar(scheme),
       body: Stack(
         children: [
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Theme.of(
-                      context,
-                    ).colorScheme.primaryContainer.withValues(alpha: 0.18),
-                    Theme.of(
-                      context,
-                    ).colorScheme.surface.withValues(alpha: 0.98),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Column(
-            children: [
-              if (controller.errorMessage != null)
-                MaterialBanner(
-                  content: Text(controller.errorMessage!),
-                  actions: [
-                    TextButton(
-                      onPressed: controller.refreshAll,
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              Expanded(
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      maxWidth: _desktopMaxContentWidth,
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surface.withValues(alpha: 0.88),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.shadow.withValues(alpha: 0.06),
-                              blurRadius: 22,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(24),
-                          child: MediaQuery(
-                            data: MediaQuery.of(context).copyWith(
-                              textScaler: _focusMode
-                                  ? const TextScaler.linear(1.08)
-                                  : const TextScaler.linear(1),
-                            ),
-                            child: _AnimatedTabStack(
-                              selectedIndex: _selectedTab,
-                              children: pages,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+          tabContent,
           if (controller.isLoading)
             Positioned.fill(
               child: IgnorePointer(
                 child: ColoredBox(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.scrim.withValues(alpha: 0.08),
+                  color: scheme.scrim.withValues(alpha: 0.06),
                   child: const Center(child: CircularProgressIndicator()),
                 ),
               ),
             ),
         ],
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          border: Border(
-            top: BorderSide(
-              color: Theme.of(context).colorScheme.outlineVariant,
+      bottomNavigationBar: _buildBottomNav(lowStockCount, outOfStockCount),
+    );
+  }
+
+  PreferredSizeWidget _buildMobileAppBar(ColorScheme scheme) {
+    return AppBar(
+      toolbarHeight: 58,
+      titleSpacing: 16,
+      elevation: 0,
+      shadowColor: scheme.shadow.withValues(alpha: 0.12),
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [scheme.primary, scheme.secondary],
+              ),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Center(
+              child: Text(
+                'JP',
+                style: TextStyle(
+                  color: scheme.onPrimary,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12,
+                ),
+              ),
             ),
           ),
+          const SizedBox(width: 10),
+          Text(
+            _activeTabTitle,
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+          ),
+        ],
+      ),
+      actions: [
+        IconButton.filledTonal(
+          tooltip: 'Lock app',
+          onPressed: () => ref.read(authControllerProvider).lock(),
+          icon: const Icon(Icons.lock_outline, size: 18),
         ),
-        child: NavigationBar(
-          height: 72,
-          labelBehavior: _focusMode
-              ? NavigationDestinationLabelBehavior.onlyShowSelected
-              : null,
-          selectedIndex: _selectedTab,
-          onDestinationSelected: (index) {
-            if (index == _selectedTab) {
-              return;
-            }
-            Navigator.of(context).pushReplacementNamed(_routeForTab(index));
-          },
-          destinations: [
-            const NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home),
-              label: 'Home',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.point_of_sale_outlined),
-              selectedIcon: Icon(Icons.point_of_sale),
-              label: 'Sell',
-            ),
-            NavigationDestination(
-              icon: Badge(
-                isLabelVisible: lowStockCount + outOfStockCount > 0,
-                label: Text('${lowStockCount + outOfStockCount}'),
-                child: const Icon(Icons.inventory_2_outlined),
-              ),
-              selectedIcon: const Icon(Icons.inventory_2),
-              label: 'Stock',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.account_balance_wallet_outlined),
-              selectedIcon: Icon(Icons.account_balance_wallet),
-              label: 'bKash',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.query_stats_outlined),
-              selectedIcon: Icon(Icons.query_stats),
-              label: 'Reports',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.people_outline),
-              selectedIcon: Icon(Icons.people),
-              label: 'Customers',
-            ),
-          ],
+        const SizedBox(width: 4),
+        IconButton(
+          tooltip: _focusMode ? 'Focus On' : 'Focus Off',
+          onPressed: () => setState(() => _focusMode = !_focusMode),
+          icon: Icon(
+            _focusMode ? Icons.visibility : Icons.visibility_outlined,
+            size: 18,
+            color: scheme.onSurface,
+          ),
         ),
+        const SizedBox(width: 8),
+      ],
+    );
+  }
+
+  Widget _buildDesktopRail(
+    bool wide,
+    int alertBadge,
+    PharmacyAppController controller,
+  ) {
+    const sideColor = Color(0xFF0A2540);
+    const selectedHighlight = Color(0xFF2563EB);
+    const selectedIcon = Color(0xFF93C5FD);
+    const unselectedIcon = Color(0xFF7DA8D6);
+    const labelColor = Color(0xFFD7EAFE);
+
+    final items = [
+      (Icons.home_outlined, Icons.home_rounded, 'Home'),
+      (Icons.point_of_sale_outlined, Icons.point_of_sale_rounded, 'Sell'),
+      (Icons.inventory_2_outlined, Icons.inventory_2_rounded, 'Stock'),
+      (Icons.account_balance_wallet_outlined, Icons.account_balance_wallet_rounded, 'bKash'),
+      (Icons.query_stats_outlined, Icons.query_stats_rounded, 'Reports'),
+      (Icons.people_outline, Icons.people_rounded, 'Customers'),
+    ];
+
+    return Container(
+      width: wide ? 200 : 68,
+      color: sideColor,
+      child: Column(
+        children: [
+          // ── Logo header ──
+          Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: wide ? 14 : 8,
+              vertical: 20,
+            ),
+            child: wide
+                ? Row(
+                    children: [
+                      _buildLogoChip(),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Jarin',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 17,
+                                height: 1.1,
+                              ),
+                            ),
+                            Text(
+                              'Pharmacy',
+                              style: TextStyle(
+                                color: Color(0xFF9CC3E9),
+                                fontWeight: FontWeight.w500,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
+                : Center(child: _buildLogoChip()),
+          ),
+          // ── Nav items ──
+          Expanded(
+            child: ListView.builder(
+              padding: EdgeInsets.symmetric(horizontal: wide ? 8 : 6),
+              itemCount: items.length,
+              itemBuilder: (context, index) {
+                final item = items[index];
+                final sel = index == _selectedTab;
+                final hasBadge = index == 2 && alertBadge > 0;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 1),
+                  child: Tooltip(
+                    message: wide ? '' : item.$3,
+                    preferBelow: false,
+                    child: InkWell(
+                      onTap: () => _navigateTo(index),
+                      borderRadius: BorderRadius.circular(10),
+                      hoverColor: Colors.white.withValues(alpha: 0.06),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: wide ? 12 : 0,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: sel
+                              ? selectedHighlight.withValues(alpha: 0.18)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                          border: sel
+                              ? Border.all(
+                                  color: selectedHighlight.withValues(alpha: 0.30),
+                                )
+                              : null,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: wide
+                              ? MainAxisAlignment.start
+                              : MainAxisAlignment.center,
+                          children: [
+                            hasBadge
+                                ? Badge(
+                                    label: Text('$alertBadge'),
+                                    child: Icon(
+                                      sel ? item.$2 : item.$1,
+                                      color: sel ? selectedIcon : unselectedIcon,
+                                      size: 22,
+                                    ),
+                                  )
+                                : Icon(
+                                    sel ? item.$2 : item.$1,
+                                    color: sel ? selectedIcon : unselectedIcon,
+                                    size: 22,
+                                  ),
+                            if (wide) ...[
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  item.$3,
+                                  style: TextStyle(
+                                    color: sel ? Colors.white : labelColor,
+                                    fontWeight: sel
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              if (sel)
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: const BoxDecoration(
+                                    color: selectedIcon,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          // ── Bottom utilities ──
+          Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: wide ? 8 : 6,
+              vertical: 12,
+            ),
+            child: Column(
+              children: [
+                const Divider(color: Color(0xFF123B63), height: 8),
+                const SizedBox(height: 4),
+                if (wide)
+                  Row(
+                    children: [
+                      _buildRailIconBtn(
+                        icon: Icons.lock_outline,
+                        tooltip: 'Lock app',
+                        onPressed: () => ref.read(authControllerProvider).lock(),
+                      ),
+                      _buildRailIconBtn(
+                        icon: _focusMode ? Icons.visibility : Icons.visibility_outlined,
+                        tooltip: _focusMode ? 'Focus On' : 'Focus Off',
+                        onPressed: () => setState(() => _focusMode = !_focusMode),
+                      ),
+                      _buildRailIconBtn(
+                        icon: Icons.refresh,
+                        tooltip: 'Refresh',
+                        onPressed: controller.isLoading ? null : controller.refreshAll,
+                      ),
+                    ],
+                  )
+                else
+                  Column(
+                    children: [
+                      _buildRailIconBtn(
+                        icon: Icons.lock_outline,
+                        tooltip: 'Lock',
+                        onPressed: () => ref.read(authControllerProvider).lock(),
+                      ),
+                      _buildRailIconBtn(
+                        icon: Icons.refresh,
+                        tooltip: 'Refresh',
+                        onPressed: controller.isLoading ? null : controller.refreshAll,
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLogoChip() {
+    return Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF2563EB), Color(0xFF38BDF8)],
+        ),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: const Center(
+        child: Text(
+          'JP',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRailIconBtn({
+    required IconData icon,
+    required String tooltip,
+    VoidCallback? onPressed,
+  }) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: Icon(
+        icon,
+        size: 18,
+        color: onPressed != null
+            ? const Color(0xFF7DA8D6)
+            : const Color(0xFF31577E),
+      ),
+    );
+  }
+
+  Widget _buildBottomNav(int lowStockCount, int outOfStockCount) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+        boxShadow: [
+          BoxShadow(
+            color: scheme.shadow.withValues(alpha: 0.14),
+            blurRadius: 12,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: NavigationBar(
+        height: 68,
+        labelBehavior: _focusMode
+            ? NavigationDestinationLabelBehavior.onlyShowSelected
+            : null,
+        selectedIndex: _selectedTab,
+        onDestinationSelected: (index) {
+          if (index == _selectedTab) {
+            return;
+          }
+          setState(() => _selectedTab = index);
+        },
+        destinations: [
+          const NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home_rounded),
+            label: 'Home',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.point_of_sale_outlined),
+            selectedIcon: Icon(Icons.point_of_sale_rounded),
+            label: 'Sell',
+          ),
+          NavigationDestination(
+            icon: Badge(
+              isLabelVisible: lowStockCount + outOfStockCount > 0,
+              label: Text('${lowStockCount + outOfStockCount}'),
+              child: const Icon(Icons.inventory_2_outlined),
+            ),
+            selectedIcon: const Icon(Icons.inventory_2_rounded),
+            label: 'Stock',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.account_balance_wallet_outlined),
+            selectedIcon: Icon(Icons.account_balance_wallet_rounded),
+            label: 'bKash',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.query_stats_outlined),
+            selectedIcon: Icon(Icons.query_stats_rounded),
+            label: 'Reports',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.people_outline),
+            selectedIcon: Icon(Icons.people_rounded),
+            label: 'Customers',
+          ),
+        ],
       ),
     );
   }
@@ -484,19 +723,7 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
     if (index == _selectedTab) {
       return;
     }
-    Navigator.of(context).pushReplacementNamed(_routeForTab(index));
-  }
-
-  String _routeForTab(int index) {
-    return switch (index) {
-      0 => AppRoutes.home,
-      1 => AppRoutes.sell,
-      2 => AppRoutes.stock,
-      3 => AppRoutes.bkash,
-      4 => AppRoutes.reports,
-      5 => AppRoutes.customers,
-      _ => AppRoutes.home,
-    };
+    setState(() => _selectedTab = index);
   }
 
   Future<void> _pickReportDate() async {
@@ -576,7 +803,7 @@ class _DashboardTabState extends State<_DashboardTab> {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        'Add medicine stock by packs and extra pieces',
+                        'Add stock by packs and extra pieces',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
@@ -594,6 +821,14 @@ class _DashboardTabState extends State<_DashboardTab> {
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
                         labelText: 'Extra Pieces',
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Pieces above one pack are auto-counted.',
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
                   ] else
@@ -657,7 +892,6 @@ class _DashboardTabState extends State<_DashboardTab> {
     if (isMedicine &&
         (packInput < 0 ||
             pieceInput < 0 ||
-            pieceInput >= product.unitsPerPack ||
             (packInput == 0 && pieceInput == 0))) {
       return;
     }
@@ -677,7 +911,7 @@ class _DashboardTabState extends State<_DashboardTab> {
       productId: product.id!,
       quantity: quantityInPieces,
       unitPrice: buyPerPiece,
-      note: 'Quick stock-in (pack)',
+      note: 'Quick stock-in (pack/piece)',
     );
   }
 
@@ -798,169 +1032,356 @@ class _DashboardTabState extends State<_DashboardTab> {
   Widget build(BuildContext context) {
     final controller = widget.controller;
     final report = controller.dashboardReport;
+    final scheme = Theme.of(context).colorScheme;
     final lowStockProducts =
         controller.products
             .where((product) => product.stockQty <= _lowStockThreshold)
             .toList()
           ..sort((left, right) => left.stockQty.compareTo(right.stockQty));
 
+    final hour = DateTime.now().hour;
+    final greeting = hour < 12
+        ? 'Good Morning'
+        : hour < 17
+        ? 'Good Afternoon'
+        : 'Good Evening';
+    final dateStr = DateFormat('EEEE, d MMMM yyyy').format(DateTime.now());
+
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.zero,
       children: [
-        Text(
-          'Today at a glance',
-          style: Theme.of(
-            context,
-          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        SizedBox(height: widget.focusMode ? 4 : 8),
-        TextField(
-          controller: _searchController,
-          autofocus: true,
-          onChanged: (value) => setState(() => _query = value),
-          decoration: InputDecoration(
-            hintText: 'Universal search: type product and quick Sell/Stock In',
-            prefixIcon: const Icon(Icons.search),
-            suffixIcon: _query.isEmpty
-                ? null
-                : IconButton(
-                    onPressed: () {
-                      setState(() {
-                        _query = '';
-                        _searchController.clear();
-                      });
-                    },
-                    icon: const Icon(Icons.clear),
-                  ),
-          ),
-        ),
-        if (_searchResults.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          if (!widget.focusMode)
-            Text(
-              'Search Results (Enter=Sell, Ctrl+Enter=Stock In)',
-              style: Theme.of(context).textTheme.bodySmall,
+        // ── Hero header ──
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                const Color(0xFF1D4ED8),
+                const Color(0xFF2563EB),
+                const Color(0xFF38BDF8),
+              ],
             ),
-          const SizedBox(height: 6),
-          ..._searchResults
-              .take(8)
-              .map(
-                (product) => _KeyboardProductActionRow(
-                  product: product,
-                  onQuickSell: () => _showQuickSell(product),
-                  onQuickStockIn: () => _showQuickStockIn(product),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                greeting,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.82),
+                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
+                  letterSpacing: 0.2,
                 ),
               ),
-          const Divider(height: 24),
-        ],
-        if (report != null)
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _SummaryCard(
-                title: 'Sales',
-                value: _money(report.salesBilling),
-                icon: Icons.trending_up,
-                color: Colors.green,
+              const SizedBox(height: 4),
+              const Text(
+                'Jarin Pharmacy',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 28,
+                  letterSpacing: -0.6,
+                  height: 1.1,
+                ),
               ),
-              _SummaryCard(
-                title: 'Purchases',
-                value: _money(report.purchaseBilling),
-                icon: Icons.shopping_bag_outlined,
-                color: Colors.blue,
-              ),
-              _SummaryCard(
-                title: 'Net Profit',
-                value: _money(report.netProfit),
-                icon: Icons.account_balance,
-                color: report.netProfit >= 0 ? Colors.teal : Colors.red,
-              ),
-              _SummaryCard(
-                title: 'Due',
-                value: _money(report.dueAmount),
-                icon: Icons.request_quote_outlined,
-                color: Colors.deepOrange,
-              ),
-              _SummaryCard(
-                title: 'Stock Value',
-                value: _money(report.stockValue),
-                icon: Icons.inventory,
-                color: Colors.orange,
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.calendar_today_outlined,
+                    color: Colors.white54,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    dateStr,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.74),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
               ),
             ],
-          )
-        else
-          const _EmptyStateCard(
-            title: 'No dashboard data yet',
-            message: 'Add products and start recording purchases or sales.',
           ),
-        if (report != null) ...[
-          const SizedBox(height: 12),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(
-                'Net P/L = Gross Profit - Due Amount - Inventory Loss + bKash Commission',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+        ),
+
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Search ──
+              TextField(
+                controller: _searchController,
+                autofocus: true,
+                onChanged: (value) => setState(() => _query = value),
+                decoration: InputDecoration(
+                  hintText: 'Search product • Enter to sell • Ctrl+Enter to stock in',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: _query.isEmpty
+                      ? null
+                      : IconButton(
+                          onPressed: () => setState(() {
+                            _query = '';
+                            _searchController.clear();
+                          }),
+                          icon: const Icon(Icons.clear, size: 18),
+                        ),
+                ),
               ),
-            ),
+              if (_searchResults.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                if (!widget.focusMode)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      'Search results — Enter=Sell, Ctrl+Enter=Stock In',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ..._searchResults.take(8).map(
+                  (product) => _KeyboardProductActionRow(
+                    product: product,
+                    onQuickSell: () => _showQuickSell(product),
+                    onQuickStockIn: () => _showQuickStockIn(product),
+                  ),
+                ),
+                const Divider(height: 24),
+              ] else
+                const SizedBox(height: 20),
+
+              // ── Stats ──
+              if (report != null) ...[
+                Row(
+                  children: [
+                    Text(
+                      "Today's Performance",
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: report.netProfit >= 0
+                          ? scheme.primaryContainer.withValues(alpha: 0.6)
+                          : scheme.errorContainer.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            report.netProfit >= 0
+                                ? Icons.arrow_upward_rounded
+                                : Icons.arrow_downward_rounded,
+                            size: 12,
+                            color: report.netProfit >= 0 ? scheme.primary : scheme.error,
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            report.netProfit >= 0 ? 'Profitable' : 'Loss',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                                color: report.netProfit >= 0 ? scheme.primary : scheme.error,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final cols = constraints.maxWidth >= 1000
+                        ? 4
+                        : constraints.maxWidth >= 680
+                        ? 3
+                        : constraints.maxWidth >= 440
+                        ? 2
+                        : 1;
+                    return GridView.count(
+                      crossAxisCount: cols,
+                      mainAxisSpacing: 10,
+                      crossAxisSpacing: 10,
+                      childAspectRatio: 1.72,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: [
+                        _SummaryCard(
+                          title: 'Sales',
+                          value: _money(report.salesBilling),
+                          icon: Icons.trending_up_rounded,
+                          color: const Color(0xFF2563EB),
+                        ),
+                        _SummaryCard(
+                          title: 'Purchases',
+                          value: _money(report.purchaseBilling),
+                          icon: Icons.shopping_cart_rounded,
+                          color: scheme.primary,
+                        ),
+                        _SummaryCard(
+                          title: 'Net Profit',
+                          value: _money(report.netProfit),
+                          icon: Icons.account_balance_rounded,
+                          color: report.netProfit >= 0
+                              ? const Color(0xFF2563EB)
+                              : scheme.error,
+                        ),
+                        _SummaryCard(
+                          title: 'Due Amount',
+                          value: _money(report.dueAmount),
+                          icon: Icons.receipt_long_rounded,
+                          color: const Color(0xFF38BDF8),
+                        ),
+                        _SummaryCard(
+                          title: 'Stock Value',
+                          value: _money(report.stockValue),
+                          icon: Icons.inventory_2_rounded,
+                          color: scheme.tertiary,
+                        ),
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 11,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline_rounded,
+                          size: 15,
+                          color: scheme.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Net P/L = Gross Profit − Due Amount − Inventory Loss + bKash Commission',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ] else
+                const _EmptyStateCard(
+                  title: 'No data yet',
+                  message:
+                      'Record purchases or sales to see today\'s summary.',
+                ),
+
+              const SizedBox(height: 22),
+
+              // ── Quick actions ──
+              Text(
+                'Quick Actions',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 10),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _QuickActionTile(
+                      title: 'New Bill',
+                      subtitle: 'Sell products',
+                      icon: Icons.point_of_sale_rounded,
+                      color: const Color(0xFF2563EB),
+                      onTap: () => widget.onNavigate(1),
+                    ),
+                    const SizedBox(width: 10),
+                    _QuickActionTile(
+                      title: 'Stock In',
+                      subtitle: 'Add inventory',
+                      icon: Icons.add_business_rounded,
+                      color: scheme.primary,
+                      onTap: () => widget.onNavigate(2),
+                    ),
+                    const SizedBox(width: 10),
+                    _QuickActionTile(
+                      title: 'Reports',
+                      subtitle: 'Business overview',
+                      icon: Icons.query_stats_rounded,
+                      color: scheme.tertiary,
+                      onTap: () => widget.onNavigate(4),
+                    ),
+                    const SizedBox(width: 10),
+                    _QuickActionTile(
+                      title: 'bKash',
+                      subtitle: 'Wallet entries',
+                      icon: Icons.account_balance_wallet_rounded,
+                      color: const Color(0xFF0EA5E9),
+                      onTap: () => widget.onNavigate(3),
+                    ),
+                    const SizedBox(width: 10),
+                    _QuickActionTile(
+                      title: 'Customers',
+                      subtitle: 'View profiles',
+                      icon: Icons.people_rounded,
+                      color: const Color(0xFF60A5FA),
+                      onTap: () => widget.onNavigate(5),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 22),
+
+              // ── Stock alerts ──
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Stock Alerts',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${lowStockProducts.length} items',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (lowStockProducts.isEmpty)
+                const _EmptyStateCard(
+                  title: 'No stock alerts',
+                  message: 'All products have healthy stock levels.',
+                )
+              else
+                ...lowStockProducts
+                    .take(8)
+                    .map((product) => _StockAlertTile(product: product)),
+            ],
           ),
-        ],
-        const SizedBox(height: 20),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            _QuickActionTile(
-              title: 'New Bill',
-              subtitle: 'Sell products fast',
-              icon: Icons.point_of_sale,
-              color: Colors.green,
-              onTap: () => widget.onNavigate(1),
-            ),
-            _QuickActionTile(
-              title: 'Stock',
-              subtitle: 'Receive, edit, adjust',
-              icon: Icons.add_business,
-              color: Colors.blue,
-              onTap: () => widget.onNavigate(2),
-            ),
-            _QuickActionTile(
-              title: 'Reports',
-              subtitle: 'Check business summary',
-              icon: Icons.inventory_2,
-              color: Colors.orange,
-              onTap: () => widget.onNavigate(4),
-            ),
-            _QuickActionTile(
-              title: 'bKash',
-              subtitle: 'Record service entries',
-              icon: Icons.account_balance_wallet,
-              color: Colors.pink,
-              onTap: () => widget.onNavigate(3),
-            ),
-          ],
         ),
-        const SizedBox(height: 20),
-        Text(
-          'Stock alerts',
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        if (lowStockProducts.isEmpty)
-          const _EmptyStateCard(
-            title: 'No low-stock products',
-            message: 'Everything currently has healthy stock levels.',
-          )
-        else
-          ...lowStockProducts
-              .take(8)
-              .map((product) => _StockAlertTile(product: product)),
       ],
     );
   }
@@ -2139,7 +2560,7 @@ class _InventoryTabState extends State<_InventoryTab> {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        'Add medicine stock by packs and extra pieces',
+                        'Add stock by packs and extra pieces',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
@@ -2157,6 +2578,14 @@ class _InventoryTabState extends State<_InventoryTab> {
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
                         labelText: 'Extra Pieces',
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Pieces above one pack are auto-counted.',
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
                   ] else
@@ -2220,7 +2649,6 @@ class _InventoryTabState extends State<_InventoryTab> {
     if (isMedicine &&
         (packInput < 0 ||
             pieceInput < 0 ||
-            pieceInput >= product.unitsPerPack ||
             (packInput == 0 && pieceInput == 0))) {
       return;
     }
@@ -2442,9 +2870,10 @@ class _InventoryTabState extends State<_InventoryTab> {
                         decimal: true,
                       ),
                       decoration: InputDecoration(
-                        labelText: selectedCategory == ProductCategory.medicine
+                        labelText: (selectedCategory == ProductCategory.medicine ||
+                                selectedCategory == ProductCategory.stationery)
                             ? 'Buy Price per Pack'
-                            : 'Buy Price',
+                            : 'Buy Price per Unit',
                         prefixText: '৳ ',
                       ),
                     ),
@@ -2455,31 +2884,43 @@ class _InventoryTabState extends State<_InventoryTab> {
                         decimal: true,
                       ),
                       decoration: InputDecoration(
-                        labelText: selectedCategory == ProductCategory.medicine
+                        labelText: (selectedCategory == ProductCategory.medicine ||
+                                selectedCategory == ProductCategory.stationery)
                             ? 'Sell Price per Pack'
-                            : 'Sell Price',
+                            : 'Sell Price per Unit',
                         prefixText: '৳ ',
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
-                      controller: selectedCategory == ProductCategory.medicine
+                      controller: (selectedCategory == ProductCategory.medicine ||
+                              selectedCategory == ProductCategory.stationery)
                           ? stockPackController
                           : stockController,
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
-                        labelText: selectedCategory == ProductCategory.medicine
+                        labelText: (selectedCategory == ProductCategory.medicine ||
+                                selectedCategory == ProductCategory.stationery)
                             ? 'Current Stock (packs)'
-                            : 'Current Stock',
+                            : 'Current Stock (units)',
                       ),
                     ),
-                    if (selectedCategory == ProductCategory.medicine) ...[
+                    if (selectedCategory == ProductCategory.medicine ||
+                        selectedCategory == ProductCategory.stationery) ...[
                       const SizedBox(height: 12),
                       TextField(
                         controller: stockPieceController,
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(
                           labelText: 'Extra Pieces',
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Pieces above one pack are auto-counted.',
+                          style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -2494,7 +2935,7 @@ class _InventoryTabState extends State<_InventoryTab> {
                       Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
-                          'Medicines are sold by piece by default.',
+                          'Products in this category are sold by piece by default.',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ),
@@ -2535,24 +2976,36 @@ class _InventoryTabState extends State<_InventoryTab> {
       return;
     }
 
-    final isMedicine = selectedCategory == ProductCategory.medicine;
-    final safeUnitsPerPack = isMedicine ? unitsPerPack : 1;
-    final buyPricePerUnit = isMedicine ? buyPrice / safeUnitsPerPack : buyPrice;
-    final sellPricePerUnit = isMedicine
+    final usePackPieceInput =
+      selectedCategory == ProductCategory.medicine ||
+      selectedCategory == ProductCategory.stationery;
+    final safeUnitsPerPack = usePackPieceInput ? unitsPerPack : 1;
+    final buyPricePerUnit = usePackPieceInput
+      ? buyPrice / safeUnitsPerPack
+      : buyPrice;
+    final sellPricePerUnit = usePackPieceInput
         ? sellPrice / safeUnitsPerPack
         : sellPrice;
-    final stockQty = isMedicine
+    if ((usePackPieceInput && (stockPacks < 0 || stockPieces < 0)) ||
+      (!usePackPieceInput && (stockQtyUnits == null || stockQtyUnits < 0))) {
+      return;
+    }
+
+    final stockQty = usePackPieceInput
         ? (stockPacks * safeUnitsPerPack) + stockPieces
-        : stockQtyUnits;
-    if (stockQty == null ||
-        stockQty < 0 ||
-        stockPieces < 0 ||
-        stockPieces >= safeUnitsPerPack) {
+        : stockQtyUnits!;
+
+    if (stockQty < 0) {
       return;
     }
 
     try {
       final selectedDgdaData = selectedDgdaMedicine?.allData ?? const {};
+      final isMedicine = selectedCategory == ProductCategory.medicine;
+      final payloadMeta = isMedicine
+          ? selectedDgdaData
+          : const <String, String>{};
+
       if (product == null) {
         await widget.controller.addProduct(
           name: nameController.text.trim(),
@@ -2561,17 +3014,19 @@ class _InventoryTabState extends State<_InventoryTab> {
           sellPrice: sellPricePerUnit,
           openingStock: stockQty,
           unitsPerPack: safeUnitsPerPack,
-          trackInPieces: isMedicine,
-          dgdaBrandId: selectedDgdaMedicine?.brandId,
-          dgdaType: selectedDgdaMedicine?.type,
-          dgdaSlug: selectedDgdaMedicine?.slug,
-          dgdaGenericName: selectedDgdaMedicine?.genericName,
-          dgdaStrength: selectedDgdaMedicine?.strength,
-          dgdaDosageForm: selectedDgdaMedicine?.dosageForm,
-          dgdaManufacturer: selectedDgdaMedicine?.manufacturer,
-          dgdaPackageContainer: selectedDgdaMedicine?.packageContainer,
-          dgdaPackageSize: selectedDgdaMedicine?.packageSize,
-          dgdaData: selectedDgdaData,
+          trackInPieces: usePackPieceInput,
+          dgdaBrandId: isMedicine ? selectedDgdaMedicine?.brandId : null,
+          dgdaType: isMedicine ? selectedDgdaMedicine?.type : null,
+          dgdaSlug: isMedicine ? selectedDgdaMedicine?.slug : null,
+          dgdaGenericName: isMedicine ? selectedDgdaMedicine?.genericName : null,
+          dgdaStrength: isMedicine ? selectedDgdaMedicine?.strength : null,
+          dgdaDosageForm: isMedicine ? selectedDgdaMedicine?.dosageForm : null,
+          dgdaManufacturer: isMedicine ? selectedDgdaMedicine?.manufacturer : null,
+          dgdaPackageContainer: isMedicine
+              ? selectedDgdaMedicine?.packageContainer
+              : null,
+          dgdaPackageSize: isMedicine ? selectedDgdaMedicine?.packageSize : null,
+          dgdaData: payloadMeta,
         );
       } else {
         await widget.controller.updateProduct(
@@ -2582,17 +3037,19 @@ class _InventoryTabState extends State<_InventoryTab> {
           sellPrice: sellPricePerUnit,
           stockQty: stockQty,
           unitsPerPack: safeUnitsPerPack,
-          trackInPieces: isMedicine,
-          dgdaBrandId: selectedDgdaMedicine?.brandId,
-          dgdaType: selectedDgdaMedicine?.type,
-          dgdaSlug: selectedDgdaMedicine?.slug,
-          dgdaGenericName: selectedDgdaMedicine?.genericName,
-          dgdaStrength: selectedDgdaMedicine?.strength,
-          dgdaDosageForm: selectedDgdaMedicine?.dosageForm,
-          dgdaManufacturer: selectedDgdaMedicine?.manufacturer,
-          dgdaPackageContainer: selectedDgdaMedicine?.packageContainer,
-          dgdaPackageSize: selectedDgdaMedicine?.packageSize,
-          dgdaData: selectedDgdaMedicine == null ? null : selectedDgdaData,
+          trackInPieces: usePackPieceInput,
+          dgdaBrandId: isMedicine ? selectedDgdaMedicine?.brandId : null,
+          dgdaType: isMedicine ? selectedDgdaMedicine?.type : null,
+          dgdaSlug: isMedicine ? selectedDgdaMedicine?.slug : null,
+          dgdaGenericName: isMedicine ? selectedDgdaMedicine?.genericName : null,
+          dgdaStrength: isMedicine ? selectedDgdaMedicine?.strength : null,
+          dgdaDosageForm: isMedicine ? selectedDgdaMedicine?.dosageForm : null,
+          dgdaManufacturer: isMedicine ? selectedDgdaMedicine?.manufacturer : null,
+          dgdaPackageContainer: isMedicine
+              ? selectedDgdaMedicine?.packageContainer
+              : null,
+          dgdaPackageSize: isMedicine ? selectedDgdaMedicine?.packageSize : null,
+          dgdaData: payloadMeta,
         );
       }
     } catch (error) {
@@ -2736,26 +3193,33 @@ class _InventoryTabState extends State<_InventoryTab> {
               itemCount: filteredProducts.length,
               itemBuilder: (context, index) {
                 final product = filteredProducts[index];
-                final hasDgdaData = product.hasDgdaData;
+                final hasDgdaData =
+                  product.category == ProductCategory.medicine &&
+                  product.hasDgdaData;
+                final hasPackPiece =
+                    product.trackInPieces && product.unitsPerPack > 1;
                 final stockColor = product.stockQty == 0
-                    ? Colors.red
-                    : product.stockQty <= _criticalStockThreshold
-                    ? Colors.deepOrange
-                    : product.stockQty <= _lowStockThreshold
-                    ? Colors.orange
-                    : Colors.green;
+                  ? Theme.of(context).colorScheme.error
+                  : product.stockQty <= _criticalStockThreshold
+                  ? const Color(0xFF1D4ED8)
+                  : product.stockQty <= _lowStockThreshold
+                  ? const Color(0xFF38BDF8)
+                  : const Color(0xFF60A5FA);
 
-                return Card(
-                  child: Focus(
-                    onKeyEvent: (node, event) {
-                      if (event is KeyDownEvent &&
-                          event.logicalKey == LogicalKeyboardKey.enter) {
-                        _showStockInDialog(product);
-                        return KeyEventResult.handled;
-                      }
-                      return KeyEventResult.ignored;
-                    },
-                    child: ListTile(
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Card(
+                    child: Focus(
+                      onKeyEvent: (node, event) {
+                        if (event is KeyDownEvent &&
+                            event.logicalKey == LogicalKeyboardKey.enter) {
+                          _showStockInDialog(product);
+                          return KeyEventResult.handled;
+                        }
+                        return KeyEventResult.ignored;
+                      },
+                      child: ListTile(
+                      minLeadingWidth: 62,
                       title: Row(
                         children: [
                           Expanded(child: Text(product.name)),
@@ -2787,17 +3251,24 @@ class _InventoryTabState extends State<_InventoryTab> {
                       subtitle: Text(
                         '${_categoryLabel(product.category)} • Buy ${_money(product.buyPrice)} • Sell ${_money(product.sellPrice)} • Stock ${_stockDisplay(product)}${product.dgdaGenericName == null || product.dgdaGenericName!.isEmpty ? '' : '\nGeneric: ${product.dgdaGenericName}'}${product.dgdaManufacturer == null || product.dgdaManufacturer!.isEmpty ? '' : '\nManufacturer: ${product.dgdaManufacturer}'}',
                       ),
-                      isThreeLine: product.dgdaGenericName != null,
-                      leading: CircleAvatar(
-                        backgroundColor: stockColor.withValues(alpha: 0.15),
-                        child: Text(
-                          _stockShortDisplay(product),
-                          style: TextStyle(
-                            color: stockColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
+                      isThreeLine:
+                          product.dgdaGenericName != null,
+                      leading: hasPackPiece
+                          ? _MedicineCountBadge(
+                              stockQty: product.stockQty,
+                              unitsPerPack: product.unitsPerPack,
+                              tone: stockColor,
+                            )
+                          : CircleAvatar(
+                              backgroundColor: stockColor.withValues(alpha: 0.15),
+                              child: Text(
+                                _stockShortDisplay(product),
+                                style: TextStyle(
+                                  color: stockColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
                       trailing: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 230),
                         child: Row(
@@ -2846,6 +3317,7 @@ class _InventoryTabState extends State<_InventoryTab> {
                             ),
                           ],
                         ),
+                      ),
                       ),
                     ),
                   ),
@@ -2938,6 +3410,10 @@ class _InventoryTabState extends State<_InventoryTab> {
                               final purchase = stockInRecords[index];
                               final product = productsById[purchase.productId];
                               final title = product?.name ?? purchase.productId;
+                              final hasPackPiece =
+                                product != null &&
+                                product.trackInPieces &&
+                                product.unitsPerPack > 1;
                               final quantityLabel = product == null
                                   ? '${purchase.quantity} units'
                                   : _quantityDisplay(
@@ -2947,6 +3423,15 @@ class _InventoryTabState extends State<_InventoryTab> {
 
                               return Card(
                                 child: ListTile(
+                                  minLeadingWidth: 62,
+                                  leading: hasPackPiece
+                                      ? _MedicineCountBadge(
+                                          stockQty: purchase.quantity,
+                                          unitsPerPack: product.unitsPerPack,
+                                          tone: Theme.of(context).colorScheme.primary,
+                                          compact: true,
+                                        )
+                                      : null,
                                   title: Text(title),
                                   subtitle: Text(
                                     '${_dateTimeLabel(purchase.createdAt)} • Qty $quantityLabel • Unit ${_money(purchase.unitPrice)}',
@@ -3586,9 +4071,13 @@ class _BkashTabState extends State<_BkashTab> {
   }
 
   Widget _buildReportSummaryCard(BkashReportSummary report) {
+    final scheme = Theme.of(context).colorScheme;
+    final totalFlow = report.totalInflow + report.totalOutflow;
+    final inflowRatio = totalFlow == 0 ? 0.0 : report.totalInflow / totalFlow;
+
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -3614,42 +4103,66 @@ class _BkashTabState extends State<_BkashTab> {
                 ),
                 Chip(
                   label: Text(report.period),
-                  backgroundColor: Colors.blue.shade100,
+                  avatar: Icon(Icons.calendar_month_outlined, size: 16, color: scheme.primary),
                 ),
               ],
             ),
             const Divider(height: 16),
-            // Current Cash Balance
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                border: Border.all(color: Colors.green.shade300),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Current Cash Balance',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.green.shade700,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _money(report.closingCashBalance),
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: Colors.green.shade900,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _FinanceKpiChip(
+                  label: 'Current Cash',
+                  value: _money(report.closingCashBalance),
+                  icon: Icons.payments_outlined,
+                  tone: scheme.secondary,
+                ),
+                _FinanceKpiChip(
+                  label: 'Current bKash',
+                  value: _money(report.closingBkashBalance),
+                  icon: Icons.account_balance_wallet_outlined,
+                  tone: scheme.primary,
+                ),
+                _FinanceKpiChip(
+                  label: 'Net Change',
+                  value: _money(report.netChange),
+                  icon: report.netChange >= 0
+                      ? Icons.trending_up
+                      : Icons.trending_down,
+                  tone: report.netChange >= 0 ? scheme.secondary : scheme.error,
+                ),
+              ],
             ),
             const SizedBox(height: 12),
-            // Opening Balances
+            Text(
+              'Cashflow Ratio',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: inflowRatio,
+                      minHeight: 10,
+                      valueColor: AlwaysStoppedAnimation<Color>(scheme.secondary),
+                      backgroundColor: scheme.error.withValues(alpha: 0.2),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  '${(inflowRatio * 100).toStringAsFixed(0)}% inflow',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
             Text(
               'Opening Balance',
               style: Theme.of(
@@ -3665,7 +4178,6 @@ class _BkashTabState extends State<_BkashTab> {
               ],
             ),
             const SizedBox(height: 12),
-            // Transaction Summary
             Text(
               'Transactions',
               style: Theme.of(
@@ -3673,25 +4185,28 @@ class _BkashTabState extends State<_BkashTab> {
               ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            _buildTransactionRow('Cash In', report.totalCashIn, Colors.green),
+            _buildTransactionRow(
+              'Cash In',
+              report.totalCashIn,
+              const Color(0xFF2563EB),
+            ),
             _buildTransactionRow('Cash Out', report.totalCashOut, Colors.red),
             _buildTransactionRow(
               'Send Money',
               report.totalSendMoney,
-              Colors.orange,
+              const Color(0xFF0EA5E9),
             ),
             _buildTransactionRow(
               'Bill Payment',
               report.totalBillPayment,
-              Colors.blue,
+              const Color(0xFF38BDF8),
             ),
             _buildTransactionRow(
               'Commission',
               report.totalCommission,
-              Colors.purple,
+              scheme.primary,
             ),
             const Divider(height: 12),
-            // Closing Balances
             Text(
               'Closing Balance',
               style: Theme.of(
@@ -3712,13 +4227,12 @@ class _BkashTabState extends State<_BkashTab> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            // Net Change
+            const SizedBox(height: 10),
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(4),
+                color: scheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -3733,7 +4247,7 @@ class _BkashTabState extends State<_BkashTab> {
                     _money(report.netChange),
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: report.netChange >= 0 ? Colors.green : Colors.red,
+                      color: report.netChange >= 0 ? scheme.secondary : scheme.error,
                     ),
                   ),
                 ],
@@ -3782,9 +4296,91 @@ class _BkashTabState extends State<_BkashTab> {
           return const Center(child: Text('No report data available'));
         }
 
-        return ListView(
-          padding: const EdgeInsets.all(8),
-          children: [_buildReportSummaryCard(snapshot.data!)],
+        final report = snapshot.data!;
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= 1120;
+
+            if (!wide) {
+              return ListView(
+                padding: const EdgeInsets.all(8),
+                children: [_buildReportSummaryCard(report)],
+              );
+            }
+
+            return ListView(
+              padding: const EdgeInsets.all(8),
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 7, child: _buildReportSummaryCard(report)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 4,
+                      child: Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Quick Insights',
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              _DialogSummaryRow(
+                                label: 'Total Inflow',
+                                value: _money(report.totalInflow),
+                                emphasize: true,
+                              ),
+                              const SizedBox(height: 8),
+                              _DialogSummaryRow(
+                                label: 'Total Outflow',
+                                value: _money(report.totalOutflow),
+                                emphasize: true,
+                              ),
+                              const Divider(height: 16),
+                              _DialogSummaryRow(
+                                label: 'Cash In Share',
+                                value: report.totalInflow == 0
+                                    ? '0%'
+                                    : '${((report.totalCashIn / report.totalInflow) * 100).toStringAsFixed(0)}%',
+                              ),
+                              const SizedBox(height: 8),
+                              _DialogSummaryRow(
+                                label: 'Cash Out Share',
+                                value: report.totalOutflow == 0
+                                    ? '0%'
+                                    : '${((report.totalCashOut / report.totalOutflow) * 100).toStringAsFixed(0)}%',
+                              ),
+                              const SizedBox(height: 8),
+                              _DialogSummaryRow(
+                                label: 'Send Money Share',
+                                value: report.totalOutflow == 0
+                                    ? '0%'
+                                    : '${((report.totalSendMoney / report.totalOutflow) * 100).toStringAsFixed(0)}%',
+                              ),
+                              const SizedBox(height: 8),
+                              _DialogSummaryRow(
+                                label: 'Bill Payment Share',
+                                value: report.totalOutflow == 0
+                                    ? '0%'
+                                    : '${((report.totalBillPayment / report.totalOutflow) * 100).toStringAsFixed(0)}%',
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -4084,155 +4680,356 @@ class _BkashTabState extends State<_BkashTab> {
   }
 }
 
-class _ReportsTab extends StatelessWidget {
+enum _ReportMetric { performance, risk, wallet }
+
+class _ReportsTab extends StatefulWidget {
   const _ReportsTab({required this.controller, required this.onPickDate});
 
   final PharmacyAppController controller;
   final VoidCallback onPickDate;
 
   @override
+  State<_ReportsTab> createState() => _ReportsTabState();
+}
+
+class _ReportsTabState extends State<_ReportsTab> {
+  _ReportMetric _selectedMetric = _ReportMetric.performance;
+
+  @override
   Widget build(BuildContext context) {
-    final report = controller.dashboardReport;
+    final report = widget.controller.dashboardReport;
     final productNames = <String, String>{
-      for (final product in controller.products) product.id!: product.name,
+      for (final product in widget.controller.products) product.id!: product.name,
     };
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: ListView(
-        children: [
-          Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 1100;
+        final columns = constraints.maxWidth >= 1360
+            ? 4
+            : constraints.maxWidth >= 1024
+            ? 3
+            : constraints.maxWidth >= 700
+            ? 2
+            : 1;
+
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: ListView(
             children: [
-              Expanded(
-                child: SegmentedButton<ReportPeriod>(
-                  segments: const [
-                    ButtonSegment<ReportPeriod>(
-                      value: ReportPeriod.day,
-                      label: Text('Day'),
+              Wrap(
+                spacing: 12,
+                runSpacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  SizedBox(
+                    width: isWide ? 520 : constraints.maxWidth - 32,
+                    child: SegmentedButton<ReportPeriod>(
+                      segments: const [
+                        ButtonSegment<ReportPeriod>(
+                          value: ReportPeriod.day,
+                          label: Text('Day'),
+                        ),
+                        ButtonSegment<ReportPeriod>(
+                          value: ReportPeriod.month,
+                          label: Text('Month'),
+                        ),
+                        ButtonSegment<ReportPeriod>(
+                          value: ReportPeriod.year,
+                          label: Text('Year'),
+                        ),
+                      ],
+                      selected: <ReportPeriod>{widget.controller.reportPeriod},
+                      onSelectionChanged: (selection) {
+                        widget.controller.setReportPeriod(selection.first);
+                      },
                     ),
-                    ButtonSegment<ReportPeriod>(
-                      value: ReportPeriod.month,
-                      label: Text('Month'),
-                    ),
-                    ButtonSegment<ReportPeriod>(
-                      value: ReportPeriod.year,
-                      label: Text('Year'),
-                    ),
-                  ],
-                  selected: <ReportPeriod>{controller.reportPeriod},
-                  onSelectionChanged: (selection) {
-                    controller.setReportPeriod(selection.first);
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: widget.onPickDate,
+                    icon: const Icon(Icons.calendar_today),
+                    label: Text(widget.controller.reportWindow?.label ?? 'Pick Date'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (report == null)
+                const _EmptyStateCard(
+                  title: 'No report data',
+                  message: 'Start recording transactions to generate reports.',
+                )
+              else ...[
+                _ReportTrendCard(
+                  report: report,
+                  selectedMetric: _selectedMetric,
+                  onMetricChanged: (value) {
+                    setState(() {
+                      _selectedMetric = value;
+                    });
                   },
                 ),
+                const SizedBox(height: 12),
+                GridView.count(
+                  crossAxisCount: columns,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  shrinkWrap: true,
+                  childAspectRatio: 1.78,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: [
+                    _SummaryCard(
+                      title: 'Sales Billing',
+                      value: _money(report.salesBilling),
+                      icon: Icons.receipt_long,
+                      color: Theme.of(context).colorScheme.tertiary,
+                    ),
+                    _SummaryCard(
+                      title: 'Purchase Billing',
+                      value: _money(report.purchaseBilling),
+                      icon: Icons.shopping_cart_outlined,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    _SummaryCard(
+                      title: 'Gross Profit',
+                      value: _money(report.grossProfit),
+                      icon: Icons.ssid_chart,
+                      color: Theme.of(context).colorScheme.secondary,
+                    ),
+                    _SummaryCard(
+                      title: 'Due Amount',
+                      value: _money(report.dueAmount),
+                      icon: Icons.request_quote_outlined,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    _SummaryCard(
+                      title: 'Net Profit/Loss',
+                      value: _money(report.netProfit),
+                      icon: Icons.account_balance,
+                      color: report.netProfit >= 0
+                          ? Theme.of(context).colorScheme.secondary
+                          : Theme.of(context).colorScheme.error,
+                    ),
+                    _SummaryCard(
+                      title: 'Inventory Loss',
+                      value: _money(report.inventoryLoss),
+                      icon: Icons.warning_amber_rounded,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    _SummaryCard(
+                      title: 'bKash Commission',
+                      value: _money(report.bkashCommission),
+                      icon: Icons.account_balance_wallet,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    _SummaryCard(
+                      title: 'Stock Value',
+                      value: _money(report.stockValue),
+                      icon: Icons.inventory_2,
+                      color: Theme.of(context).colorScheme.tertiary,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.insights_outlined,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Net P/L = Gross Profit - Due Amount - Inventory Loss + bKash Commission',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+              Text(
+                'Recent Loss Entries',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
-              const SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: onPickDate,
-                icon: const Icon(Icons.calendar_today),
-                label: Text(controller.reportWindow?.label ?? 'Pick Date'),
-              ),
+              const SizedBox(height: 8),
+              if (widget.controller.adjustments.isEmpty)
+                const Text('No inventory loss adjustments in this period.')
+              else
+                ...widget.controller.adjustments.map(
+                  (adjustment) => Card(
+                    child: ListTile(
+                      title: Text(
+                        productNames[adjustment.productId] ?? adjustment.productId,
+                      ),
+                      subtitle: Text(
+                        '${adjustment.reason} • Qty ${adjustment.deltaQty} • ${_dateTimeLabel(adjustment.createdAt)}',
+                      ),
+                      trailing: Text(_money(adjustment.lossValue)),
+                    ),
+                  ),
+                ),
             ],
           ),
-          const SizedBox(height: 16),
-          if (report == null)
-            const _EmptyStateCard(
-              title: 'No report data',
-              message: 'Start recording transactions to generate reports.',
-            )
-          else ...[
+        );
+      },
+    );
+  }
+}
+
+class _ReportTrendCard extends StatelessWidget {
+  const _ReportTrendCard({
+    required this.report,
+    required this.selectedMetric,
+    required this.onMetricChanged,
+  });
+
+  final DashboardReport report;
+  final _ReportMetric selectedMetric;
+  final ValueChanged<_ReportMetric> onMetricChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final series = switch (selectedMetric) {
+      _ReportMetric.performance => <_ChartPoint>[
+        _ChartPoint('Sales', report.salesBilling),
+        _ChartPoint('Purchase', report.purchaseBilling),
+        _ChartPoint('Gross', report.grossProfit),
+        _ChartPoint('Net', report.netProfit),
+      ],
+      _ReportMetric.risk => <_ChartPoint>[
+        _ChartPoint('Due', report.dueAmount),
+        _ChartPoint('Loss', report.inventoryLoss),
+        _ChartPoint('Net', report.netProfit),
+      ],
+      _ReportMetric.wallet => <_ChartPoint>[
+        _ChartPoint('Cash In', report.bkashIn),
+        _ChartPoint('Cash Out', report.bkashOut),
+        _ChartPoint('Commission', report.bkashCommission),
+      ],
+    };
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Wrap(
-              spacing: 12,
-              runSpacing: 12,
+              spacing: 10,
+              runSpacing: 10,
               children: [
-                _SummaryCard(
-                  title: 'Sales Billing',
-                  value: _money(report.salesBilling),
-                  icon: Icons.receipt_long,
-                  color: Colors.green,
+                Text(
+                  'Performance Trend',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                _SummaryCard(
-                  title: 'Purchase Billing',
-                  value: _money(report.purchaseBilling),
-                  icon: Icons.shopping_cart_outlined,
-                  color: Colors.blue,
-                ),
-                _SummaryCard(
-                  title: 'Gross Profit',
-                  value: _money(report.grossProfit),
-                  icon: Icons.ssid_chart,
-                  color: Colors.teal,
-                ),
-                _SummaryCard(
-                  title: 'Due Amount',
-                  value: _money(report.dueAmount),
-                  icon: Icons.request_quote_outlined,
-                  color: Colors.deepOrange,
-                ),
-                _SummaryCard(
-                  title: 'Net Profit/Loss',
-                  value: _money(report.netProfit),
-                  icon: Icons.account_balance,
-                  color: report.netProfit >= 0 ? Colors.teal : Colors.red,
-                ),
-                _SummaryCard(
-                  title: 'Inventory Loss',
-                  value: _money(report.inventoryLoss),
-                  icon: Icons.warning_amber_rounded,
-                  color: Colors.red,
-                ),
-                _SummaryCard(
-                  title: 'bKash Commission',
-                  value: _money(report.bkashCommission),
-                  icon: Icons.account_balance_wallet,
-                  color: Colors.pink,
-                ),
-                _SummaryCard(
-                  title: 'Stock Value',
-                  value: _money(report.stockValue),
-                  icon: Icons.inventory_2,
-                  color: Colors.orange,
+                SegmentedButton<_ReportMetric>(
+                  segments: const [
+                    ButtonSegment(
+                      value: _ReportMetric.performance,
+                      label: Text('Performance'),
+                    ),
+                    ButtonSegment(
+                      value: _ReportMetric.risk,
+                      label: Text('Risk'),
+                    ),
+                    ButtonSegment(
+                      value: _ReportMetric.wallet,
+                      label: Text('Wallet'),
+                    ),
+                  ],
+                  selected: {_ReportMetric.values.firstWhere((metric) => metric == selectedMetric)},
+                  onSelectionChanged: (selection) {
+                    onMetricChanged(selection.first);
+                  },
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(
-                  'Net P/L = Gross Profit - Due Amount - Inventory Loss + bKash Commission',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                ),
-              ),
-            ),
+            const SizedBox(height: 14),
+            _BarSeriesChart(points: series),
           ],
-          const SizedBox(height: 20),
-          Text(
-            'Recent Loss Entries',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          if (controller.adjustments.isEmpty)
-            const Text('No inventory loss adjustments in this period.')
-          else
-            ...controller.adjustments.map(
-              (adjustment) => Card(
-                child: ListTile(
-                  title: Text(
-                    productNames[adjustment.productId] ?? adjustment.productId,
+        ),
+      ),
+    );
+  }
+}
+
+class _ChartPoint {
+  const _ChartPoint(this.label, this.value);
+
+  final String label;
+  final double value;
+}
+
+class _BarSeriesChart extends StatelessWidget {
+  const _BarSeriesChart({required this.points});
+
+  final List<_ChartPoint> points;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxAbs = points
+        .map((point) => point.value.abs())
+        .fold<double>(1, (previous, element) => element > previous ? element : previous);
+
+    final scheme = Theme.of(context).colorScheme;
+
+    return Column(
+      children: points
+          .map(
+            (point) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 88,
+                    child: Text(
+                      point.label,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                   ),
-                  subtitle: Text(
-                    '${adjustment.reason} • Qty ${adjustment.deltaQty} • ${_dateTimeLabel(adjustment.createdAt)}',
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(999),
+                      child: LinearProgressIndicator(
+                        value: (point.value.abs() / maxAbs).clamp(0, 1),
+                        minHeight: 10,
+                        backgroundColor: scheme.surfaceContainerHighest,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          point.value >= 0 ? scheme.primary : scheme.error,
+                        ),
+                      ),
+                    ),
                   ),
-                  trailing: Text(_money(adjustment.lossValue)),
-                ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 110,
+                    child: Text(
+                      _money(point.value),
+                      textAlign: TextAlign.right,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-        ],
-      ),
+          )
+          .toList(),
     );
   }
 }
@@ -4323,47 +5120,140 @@ class _SummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return SizedBox(
-      width: 240,
-      child: _HoverLift(
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(icon, color: color),
+    return _HoverLift(
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  value,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: -0.2,
+                    child: Icon(icon, color: color, size: 18),
                   ),
-                ),
-              ],
-            ),
+                  const Spacer(),
+                  Container(
+                    width: 4,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.30),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    value,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.4,
+                      color: scheme.onSurface,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MedicineCountBadge extends StatelessWidget {
+  const _MedicineCountBadge({
+    required this.stockQty,
+    required this.unitsPerPack,
+    required this.tone,
+    this.compact = false,
+  });
+
+  final int stockQty;
+  final int unitsPerPack;
+  final Color tone;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final safeUnits = unitsPerPack <= 0 ? 1 : unitsPerPack;
+    final packs = stockQty ~/ safeUnits;
+    final pieces = stockQty % safeUnits;
+    final pieceRatio = (pieces / safeUnits).clamp(0, 1).toDouble();
+    final textTheme = Theme.of(context).textTheme;
+
+    return Tooltip(
+      message: '$packs packs, $pieces pieces • $safeUnits pieces/pack',
+      child: Container(
+        width: compact ? 56 : 64,
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 5 : 6,
+          vertical: compact ? 4 : 5,
+        ),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              tone.withValues(alpha: 0.24),
+              tone.withValues(alpha: 0.08),
+            ],
+          ),
+          border: Border.all(color: tone.withValues(alpha: 0.24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${packs}P',
+              style: textTheme.labelLarge?.copyWith(
+                color: tone,
+                fontWeight: FontWeight.w800,
+                height: 1,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              '${pieces}pc',
+              style: textTheme.labelSmall?.copyWith(
+                color: tone.withValues(alpha: 0.9),
+                fontWeight: FontWeight.w700,
+                height: 1,
+              ),
+            ),
+            const SizedBox(height: 4),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                minHeight: 4,
+                value: pieceRatio,
+                backgroundColor: tone.withValues(alpha: 0.14),
+                valueColor: AlwaysStoppedAnimation<Color>(tone),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -4389,38 +5279,46 @@ class _QuickActionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return SizedBox(
-      width: 220,
-      child: _HoverLift(
-        child: Card(
+    return _HoverLift(
+      child: SizedBox(
+        width: 152,
+        child: Material(
+          color: Colors.transparent,
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(18),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerLowest,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: color.withValues(alpha: 0.22),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(
-                    backgroundColor: color.withValues(alpha: 0.15),
-                    child: Icon(icon, color: color),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, color: color, size: 20),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: Theme.of(context).textTheme.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: scheme.onSurfaceVariant),
-                        ),
-                      ],
+                  const SizedBox(height: 10),
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -4440,34 +5338,65 @@ class _StockAlertTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = product.stockQty == 0
-        ? Colors.red
-        : product.stockQty <= _criticalStockThreshold
-        ? Colors.deepOrange
-        : Colors.orange;
+    final isOut = product.stockQty == 0;
+    final isCritical =
+        product.stockQty <= _criticalStockThreshold && !isOut;
+    final color = isOut
+      ? Theme.of(context).colorScheme.error
+      : isCritical
+      ? const Color(0xFF1D4ED8)
+      : const Color(0xFF38BDF8);
+    final label = isOut ? 'OUT' : isCritical ? 'CRITICAL' : 'LOW';
 
-    return _HoverLift(
-      child: Card(
-        child: ListTile(
-          leading: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.22)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 7,
+                vertical: 3,
+              ),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 10,
+                  letterSpacing: 0.5,
+                ),
+              ),
             ),
-            child: Icon(Icons.warning_amber_rounded, color: color),
-          ),
-          title: Text(product.name),
-          subtitle: Text(
-            '${_categoryLabel(product.category)} • Stock ${_stockDisplay(product)}',
-          ),
-          trailing: Text(
-            _money(product.sellPrice),
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.onSurface,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                product.name,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
-          ),
+            const SizedBox(width: 8),
+            Text(
+              _stockShortDisplay(product),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: color,
+                fontSize: 13,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -4532,39 +5461,45 @@ class _EmptyStateCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: scheme.secondaryContainer,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(
-                Icons.inbox_outlined,
-                color: scheme.onSecondaryContainer,
-              ),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: scheme.primaryContainer.withValues(alpha: 0.4),
+              shape: BoxShape.circle,
             ),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            child: Icon(
+              Icons.inbox_rounded,
+              color: scheme.primary.withValues(alpha: 0.7),
+              size: 28,
             ),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -4603,37 +5538,53 @@ class _DialogSummaryRow extends StatelessWidget {
   }
 }
 
-class _AnimatedTabStack extends StatelessWidget {
-  const _AnimatedTabStack({
-    required this.selectedIndex,
-    required this.children,
+class _FinanceKpiChip extends StatelessWidget {
+  const _FinanceKpiChip({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.tone,
   });
 
-  final int selectedIndex;
-  final List<Widget> children;
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color tone;
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: List.generate(children.length, (index) {
-        final selected = index == selectedIndex;
-
-        return IgnorePointer(
-          ignoring: !selected,
-          child: AnimatedSlide(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            offset: selected ? Offset.zero : const Offset(0.02, 0),
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              opacity: selected ? 1 : 0,
-              child: TickerMode(enabled: selected, child: children[index]),
-            ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          colors: [tone.withValues(alpha: 0.22), tone.withValues(alpha: 0.08)],
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: tone),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                value,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
-        );
-      }),
+        ],
+      ),
     );
   }
 }
@@ -4655,16 +5606,22 @@ class _HoverLiftState extends State<_HoverLift> {
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedScale(
+      child: AnimatedContainer(
         duration: _microAnimationDuration,
         curve: Curves.easeOut,
-        scale: _hovered ? 1.01 : 1,
-        child: AnimatedContainer(
-          duration: _microAnimationDuration,
-          curve: Curves.easeOut,
-          transform: Matrix4.translationValues(0, _hovered ? -1 : 0, 0),
-          child: widget.child,
+        transform: Matrix4.translationValues(0, _hovered ? -0.4 : 0, 0),
+        decoration: BoxDecoration(
+          boxShadow: _hovered
+              ? [
+                  BoxShadow(
+                    color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
         ),
+        child: widget.child,
       ),
     );
   }

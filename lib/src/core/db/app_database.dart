@@ -12,7 +12,7 @@ class AppDatabase {
   static const String walkInCustomerId = 'customer-walkin-default';
   static const String walkInCustomerName = 'Walk-in customer';
   static const String _databaseName = 'jarin_pharmacy.db';
-  static const int _databaseVersion = 11;
+  static const int _databaseVersion = 12;
 
   Database? _database;
   Future<Database>? _openingDatabase;
@@ -97,6 +97,31 @@ class AppDatabase {
     if (oldVersion < 11) {
       await _migrateBkashAccounts(db);
     }
+    if (oldVersion < 12) {
+      await _migrateAuthTables(db);
+    }
+  }
+
+  Future<void> _migrateAuthTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS auth_users(
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        password_salt TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS auth_state(
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    ''');
+
+    await _createIndexes(db);
   }
 
   Future<void> _migrateBkashAccounts(Database db) async {
@@ -831,6 +856,24 @@ class AppDatabase {
       )
     ''');
 
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS auth_users(
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        password_salt TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS auth_state(
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    ''');
+
     await _createIndexes(db);
   }
 
@@ -880,6 +923,11 @@ class AppDatabase {
     await db
         .execute(
           'CREATE INDEX IF NOT EXISTS idx_invoice_payments_customer_id ON invoice_payments(customer_id)',
+        )
+        .catchError((_) {});
+    await db
+        .execute(
+          'CREATE INDEX IF NOT EXISTS idx_auth_users_email ON auth_users(email)',
         )
         .catchError((_) {});
   }

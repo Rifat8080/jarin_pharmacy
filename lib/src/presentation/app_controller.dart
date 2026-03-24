@@ -162,6 +162,10 @@ class PharmacyAppController extends ChangeNotifier {
     Map<String, String> dgdaData = const {},
   }) async {
     final isMedicine = category == ProductCategory.medicine;
+    final shouldTrackInPieces = isMedicine || trackInPieces;
+    final normalizedUnitsPerPack = shouldTrackInPieces
+        ? (unitsPerPack <= 0 ? 1 : unitsPerPack)
+        : 1;
     await _products.createProduct(
       Product(
         id: null,
@@ -170,8 +174,8 @@ class PharmacyAppController extends ChangeNotifier {
         buyPrice: buyPrice,
         sellPrice: sellPrice,
         stockQty: openingStock,
-        unitsPerPack: isMedicine ? unitsPerPack : 1,
-        trackInPieces: isMedicine ? true : false,
+        unitsPerPack: normalizedUnitsPerPack,
+        trackInPieces: shouldTrackInPieces,
         dgdaBrandId: isMedicine ? dgdaBrandId : null,
         dgdaType: isMedicine ? dgdaType : null,
         dgdaSlug: isMedicine ? dgdaSlug : null,
@@ -209,6 +213,10 @@ class PharmacyAppController extends ChangeNotifier {
     Map<String, String>? dgdaData,
   }) async {
     final isMedicine = category == ProductCategory.medicine;
+    final shouldTrackInPieces = isMedicine || trackInPieces;
+    final normalizedUnitsPerPack = shouldTrackInPieces
+        ? (unitsPerPack <= 0 ? 1 : unitsPerPack)
+        : 1;
     final existing = products.firstWhere((item) => item.id == productId);
     await _products.updateProduct(
       existing.copyWith(
@@ -217,8 +225,8 @@ class PharmacyAppController extends ChangeNotifier {
         buyPrice: buyPrice,
         sellPrice: sellPrice,
         stockQty: stockQty,
-        unitsPerPack: isMedicine ? unitsPerPack : 1,
-        trackInPieces: isMedicine ? true : false,
+        unitsPerPack: normalizedUnitsPerPack,
+        trackInPieces: shouldTrackInPieces,
         dgdaBrandId: isMedicine ? (dgdaBrandId ?? existing.dgdaBrandId) : null,
         dgdaType: isMedicine ? (dgdaType ?? existing.dgdaType) : null,
         dgdaSlug: isMedicine ? (dgdaSlug ?? existing.dgdaSlug) : null,
