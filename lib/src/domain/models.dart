@@ -580,6 +580,7 @@ class BkashTransaction {
   final double netAmount;
   final DateTime createdAt;
   final String? note;
+
   /// Destination account for [BkashType.transfer] transactions.
   final String? toAccountId;
 

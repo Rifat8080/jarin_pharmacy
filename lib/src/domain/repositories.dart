@@ -922,8 +922,7 @@ class TransactionRepository {
         charge: existing.charge,
         reverse: true,
       );
-      if (existing.type == BkashType.transfer &&
-          existing.toAccountId != null) {
+      if (existing.type == BkashType.transfer && existing.toAccountId != null) {
         await txn.rawUpdate(
           'UPDATE bkash_accounts SET bkash_balance = bkash_balance - ? WHERE id = ?',
           [existing.amount, existing.toAccountId],
@@ -982,8 +981,7 @@ class TransactionRepository {
       );
 
       // For transfers: also reverse the destination credit.
-      if (existing.type == BkashType.transfer &&
-          existing.toAccountId != null) {
+      if (existing.type == BkashType.transfer && existing.toAccountId != null) {
         await txn.rawUpdate(
           'UPDATE bkash_accounts SET bkash_balance = bkash_balance - ? WHERE id = ?',
           [existing.amount, existing.toAccountId],
@@ -1385,7 +1383,8 @@ class TransactionRepository {
       switch (txn.type) {
         case BkashType.cashIn:
           openingBkashBalance -= txn.amount;
-          openingCashBalance += (txn.amount + txn.charge); // reverse cash deduction
+          openingCashBalance +=
+              (txn.amount + txn.charge); // reverse cash deduction
           break;
         case BkashType.cashOut:
         case BkashType.sendMoney:

@@ -40,8 +40,7 @@ String _bkashTypeLabel(BkashType type) {
 }
 
 String _stockDisplay(Product product) {
-  if (product.trackInPieces &&
-      product.unitsPerPack > 1) {
+  if (product.trackInPieces && product.unitsPerPack > 1) {
     final packs = product.stockQty ~/ product.unitsPerPack;
     final pieces = product.stockQty % product.unitsPerPack;
     return '$packs pack, $pieces pcs';
@@ -50,8 +49,7 @@ String _stockDisplay(Product product) {
 }
 
 String _stockShortDisplay(Product product) {
-  if (product.trackInPieces &&
-      product.unitsPerPack > 1) {
+  if (product.trackInPieces && product.unitsPerPack > 1) {
     final packs = product.stockQty ~/ product.unitsPerPack;
     final pieces = product.stockQty % product.unitsPerPack;
     return '${packs}P ${pieces}pc';
@@ -60,8 +58,7 @@ String _stockShortDisplay(Product product) {
 }
 
 String _quantityDisplay(Product product, int quantity) {
-  if (product.trackInPieces &&
-      product.unitsPerPack > 1) {
+  if (product.trackInPieces && product.unitsPerPack > 1) {
     final packs = quantity ~/ product.unitsPerPack;
     final pieces = quantity % product.unitsPerPack;
     return '$packs pack, $pieces pcs';
@@ -73,9 +70,7 @@ String _deltaQuantityDisplay(Product? product, int deltaQuantity) {
   final sign = deltaQuantity >= 0 ? '+' : '-';
   final absolute = deltaQuantity.abs();
 
-  if (product != null &&
-      product.trackInPieces &&
-      product.unitsPerPack > 1) {
+  if (product != null && product.trackInPieces && product.unitsPerPack > 1) {
     final packs = absolute ~/ product.unitsPerPack;
     final pieces = absolute % product.unitsPerPack;
     return '$sign$packs pack, $pieces pcs';
@@ -251,20 +246,20 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
 
     final selectedPage = switch (_selectedTab) {
       0 => _DashboardTab(
-          controller: controller,
-          onNavigate: _navigateTo,
-          focusMode: _focusMode,
-        ),
+        controller: controller,
+        onNavigate: _navigateTo,
+        focusMode: _focusMode,
+      ),
       1 => _SellTab(controller: controller, focusMode: _focusMode),
       2 => _InventoryTab(controller: controller, focusMode: _focusMode),
       3 => _BkashTab(controller: controller),
       4 => _ReportsTab(controller: controller, onPickDate: _pickReportDate),
       5 => const CustomerListPage(showScaffold: false),
       _ => _DashboardTab(
-          controller: controller,
-          onNavigate: _navigateTo,
-          focusMode: _focusMode,
-        ),
+        controller: controller,
+        onNavigate: _navigateTo,
+        focusMode: _focusMode,
+      ),
     };
 
     final scheme = Theme.of(context).colorScheme;
@@ -304,7 +299,11 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
           children: [
             Row(
               children: [
-                _buildDesktopRail(isWideRail, lowStockCount + outOfStockCount, controller),
+                _buildDesktopRail(
+                  isWideRail,
+                  lowStockCount + outOfStockCount,
+                  controller,
+                ),
                 VerticalDivider(
                   width: 1,
                   thickness: 1,
@@ -422,7 +421,11 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
       (Icons.home_outlined, Icons.home_rounded, 'Home'),
       (Icons.point_of_sale_outlined, Icons.point_of_sale_rounded, 'Sell'),
       (Icons.inventory_2_outlined, Icons.inventory_2_rounded, 'Stock'),
-      (Icons.account_balance_wallet_outlined, Icons.account_balance_wallet_rounded, 'bKash'),
+      (
+        Icons.account_balance_wallet_outlined,
+        Icons.account_balance_wallet_rounded,
+        'bKash',
+      ),
       (Icons.query_stats_outlined, Icons.query_stats_rounded, 'Reports'),
       (Icons.people_outline, Icons.people_rounded, 'Customers'),
     ];
@@ -502,7 +505,9 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
                           borderRadius: BorderRadius.circular(10),
                           border: sel
                               ? Border.all(
-                                  color: selectedHighlight.withValues(alpha: 0.30),
+                                  color: selectedHighlight.withValues(
+                                    alpha: 0.30,
+                                  ),
                                 )
                               : null,
                         ),
@@ -516,7 +521,9 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
                                     label: Text('$alertBadge'),
                                     child: Icon(
                                       sel ? item.$2 : item.$1,
-                                      color: sel ? selectedIcon : unselectedIcon,
+                                      color: sel
+                                          ? selectedIcon
+                                          : unselectedIcon,
                                       size: 22,
                                     ),
                                   )
@@ -574,17 +581,23 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
                       _buildRailIconBtn(
                         icon: Icons.lock_outline,
                         tooltip: 'Lock app',
-                        onPressed: () => ref.read(authControllerProvider).lock(),
+                        onPressed: () =>
+                            ref.read(authControllerProvider).lock(),
                       ),
                       _buildRailIconBtn(
-                        icon: _focusMode ? Icons.visibility : Icons.visibility_outlined,
+                        icon: _focusMode
+                            ? Icons.visibility
+                            : Icons.visibility_outlined,
                         tooltip: _focusMode ? 'Focus On' : 'Focus Off',
-                        onPressed: () => setState(() => _focusMode = !_focusMode),
+                        onPressed: () =>
+                            setState(() => _focusMode = !_focusMode),
                       ),
                       _buildRailIconBtn(
                         icon: Icons.refresh,
                         tooltip: 'Refresh',
-                        onPressed: controller.isLoading ? null : controller.refreshAll,
+                        onPressed: controller.isLoading
+                            ? null
+                            : controller.refreshAll,
                       ),
                     ],
                   )
@@ -594,12 +607,15 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
                       _buildRailIconBtn(
                         icon: Icons.lock_outline,
                         tooltip: 'Lock',
-                        onPressed: () => ref.read(authControllerProvider).lock(),
+                        onPressed: () =>
+                            ref.read(authControllerProvider).lock(),
                       ),
                       _buildRailIconBtn(
                         icon: Icons.refresh,
                         tooltip: 'Refresh',
-                        onPressed: controller.isLoading ? null : controller.refreshAll,
+                        onPressed: controller.isLoading
+                            ? null
+                            : controller.refreshAll,
                       ),
                     ],
                   ),
@@ -1123,7 +1139,8 @@ class _DashboardTabState extends State<_DashboardTab> {
                 autofocus: true,
                 onChanged: (value) => setState(() => _query = value),
                 decoration: InputDecoration(
-                  hintText: 'Search product • Enter to sell • Ctrl+Enter to stock in',
+                  hintText:
+                      'Search product • Enter to sell • Ctrl+Enter to stock in',
                   prefixIcon: const Icon(Icons.search, size: 20),
                   suffixIcon: _query.isEmpty
                       ? null
@@ -1148,13 +1165,15 @@ class _DashboardTabState extends State<_DashboardTab> {
                       ),
                     ),
                   ),
-                ..._searchResults.take(8).map(
-                  (product) => _KeyboardProductActionRow(
-                    product: product,
-                    onQuickSell: () => _showQuickSell(product),
-                    onQuickStockIn: () => _showQuickStockIn(product),
-                  ),
-                ),
+                ..._searchResults
+                    .take(8)
+                    .map(
+                      (product) => _KeyboardProductActionRow(
+                        product: product,
+                        onQuickSell: () => _showQuickSell(product),
+                        onQuickStockIn: () => _showQuickStockIn(product),
+                      ),
+                    ),
                 const Divider(height: 24),
               ] else
                 const SizedBox(height: 20),
@@ -1177,8 +1196,8 @@ class _DashboardTabState extends State<_DashboardTab> {
                       ),
                       decoration: BoxDecoration(
                         color: report.netProfit >= 0
-                          ? scheme.primaryContainer.withValues(alpha: 0.6)
-                          : scheme.errorContainer.withValues(alpha: 0.6),
+                            ? scheme.primaryContainer.withValues(alpha: 0.6)
+                            : scheme.errorContainer.withValues(alpha: 0.6),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
@@ -1189,7 +1208,9 @@ class _DashboardTabState extends State<_DashboardTab> {
                                 ? Icons.arrow_upward_rounded
                                 : Icons.arrow_downward_rounded,
                             size: 12,
-                            color: report.netProfit >= 0 ? scheme.primary : scheme.error,
+                            color: report.netProfit >= 0
+                                ? scheme.primary
+                                : scheme.error,
                           ),
                           const SizedBox(width: 3),
                           Text(
@@ -1197,7 +1218,9 @@ class _DashboardTabState extends State<_DashboardTab> {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                                color: report.netProfit >= 0 ? scheme.primary : scheme.error,
+                              color: report.netProfit >= 0
+                                  ? scheme.primary
+                                  : scheme.error,
                             ),
                           ),
                         ],
@@ -1288,8 +1311,7 @@ class _DashboardTabState extends State<_DashboardTab> {
               ] else
                 const _EmptyStateCard(
                   title: 'No data yet',
-                  message:
-                      'Record purchases or sales to see today\'s summary.',
+                  message: 'Record purchases or sales to see today\'s summary.',
                 ),
 
               const SizedBox(height: 22),
@@ -1297,9 +1319,9 @@ class _DashboardTabState extends State<_DashboardTab> {
               // ── Quick actions ──
               Text(
                 'Quick Actions',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 10),
               SingleChildScrollView(
@@ -2871,7 +2893,8 @@ class _InventoryTabState extends State<_InventoryTab> {
                         decimal: true,
                       ),
                       decoration: InputDecoration(
-                        labelText: (selectedCategory == ProductCategory.medicine ||
+                        labelText:
+                            (selectedCategory == ProductCategory.medicine ||
                                 selectedCategory == ProductCategory.stationery)
                             ? 'Buy Price per Pack'
                             : 'Buy Price per Unit',
@@ -2885,7 +2908,8 @@ class _InventoryTabState extends State<_InventoryTab> {
                         decimal: true,
                       ),
                       decoration: InputDecoration(
-                        labelText: (selectedCategory == ProductCategory.medicine ||
+                        labelText:
+                            (selectedCategory == ProductCategory.medicine ||
                                 selectedCategory == ProductCategory.stationery)
                             ? 'Sell Price per Pack'
                             : 'Sell Price per Unit',
@@ -2894,13 +2918,15 @@ class _InventoryTabState extends State<_InventoryTab> {
                     ),
                     const SizedBox(height: 12),
                     TextField(
-                      controller: (selectedCategory == ProductCategory.medicine ||
+                      controller:
+                          (selectedCategory == ProductCategory.medicine ||
                               selectedCategory == ProductCategory.stationery)
                           ? stockPackController
                           : stockController,
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
-                        labelText: (selectedCategory == ProductCategory.medicine ||
+                        labelText:
+                            (selectedCategory == ProductCategory.medicine ||
                                 selectedCategory == ProductCategory.stationery)
                             ? 'Current Stock (packs)'
                             : 'Current Stock (units)',
@@ -2978,17 +3004,17 @@ class _InventoryTabState extends State<_InventoryTab> {
     }
 
     final usePackPieceInput =
-      selectedCategory == ProductCategory.medicine ||
-      selectedCategory == ProductCategory.stationery;
+        selectedCategory == ProductCategory.medicine ||
+        selectedCategory == ProductCategory.stationery;
     final safeUnitsPerPack = usePackPieceInput ? unitsPerPack : 1;
     final buyPricePerUnit = usePackPieceInput
-      ? buyPrice / safeUnitsPerPack
-      : buyPrice;
+        ? buyPrice / safeUnitsPerPack
+        : buyPrice;
     final sellPricePerUnit = usePackPieceInput
         ? sellPrice / safeUnitsPerPack
         : sellPrice;
     if ((usePackPieceInput && (stockPacks < 0 || stockPieces < 0)) ||
-      (!usePackPieceInput && (stockQtyUnits == null || stockQtyUnits < 0))) {
+        (!usePackPieceInput && (stockQtyUnits == null || stockQtyUnits < 0))) {
       return;
     }
 
@@ -3019,14 +3045,20 @@ class _InventoryTabState extends State<_InventoryTab> {
           dgdaBrandId: isMedicine ? selectedDgdaMedicine?.brandId : null,
           dgdaType: isMedicine ? selectedDgdaMedicine?.type : null,
           dgdaSlug: isMedicine ? selectedDgdaMedicine?.slug : null,
-          dgdaGenericName: isMedicine ? selectedDgdaMedicine?.genericName : null,
+          dgdaGenericName: isMedicine
+              ? selectedDgdaMedicine?.genericName
+              : null,
           dgdaStrength: isMedicine ? selectedDgdaMedicine?.strength : null,
           dgdaDosageForm: isMedicine ? selectedDgdaMedicine?.dosageForm : null,
-          dgdaManufacturer: isMedicine ? selectedDgdaMedicine?.manufacturer : null,
+          dgdaManufacturer: isMedicine
+              ? selectedDgdaMedicine?.manufacturer
+              : null,
           dgdaPackageContainer: isMedicine
               ? selectedDgdaMedicine?.packageContainer
               : null,
-          dgdaPackageSize: isMedicine ? selectedDgdaMedicine?.packageSize : null,
+          dgdaPackageSize: isMedicine
+              ? selectedDgdaMedicine?.packageSize
+              : null,
           dgdaData: payloadMeta,
         );
       } else {
@@ -3042,14 +3074,20 @@ class _InventoryTabState extends State<_InventoryTab> {
           dgdaBrandId: isMedicine ? selectedDgdaMedicine?.brandId : null,
           dgdaType: isMedicine ? selectedDgdaMedicine?.type : null,
           dgdaSlug: isMedicine ? selectedDgdaMedicine?.slug : null,
-          dgdaGenericName: isMedicine ? selectedDgdaMedicine?.genericName : null,
+          dgdaGenericName: isMedicine
+              ? selectedDgdaMedicine?.genericName
+              : null,
           dgdaStrength: isMedicine ? selectedDgdaMedicine?.strength : null,
           dgdaDosageForm: isMedicine ? selectedDgdaMedicine?.dosageForm : null,
-          dgdaManufacturer: isMedicine ? selectedDgdaMedicine?.manufacturer : null,
+          dgdaManufacturer: isMedicine
+              ? selectedDgdaMedicine?.manufacturer
+              : null,
           dgdaPackageContainer: isMedicine
               ? selectedDgdaMedicine?.packageContainer
               : null,
-          dgdaPackageSize: isMedicine ? selectedDgdaMedicine?.packageSize : null,
+          dgdaPackageSize: isMedicine
+              ? selectedDgdaMedicine?.packageSize
+              : null,
           dgdaData: payloadMeta,
         );
       }
@@ -3195,17 +3233,17 @@ class _InventoryTabState extends State<_InventoryTab> {
               itemBuilder: (context, index) {
                 final product = filteredProducts[index];
                 final hasDgdaData =
-                  product.category == ProductCategory.medicine &&
-                  product.hasDgdaData;
+                    product.category == ProductCategory.medicine &&
+                    product.hasDgdaData;
                 final hasPackPiece =
                     product.trackInPieces && product.unitsPerPack > 1;
                 final stockColor = product.stockQty == 0
-                  ? Theme.of(context).colorScheme.error
-                  : product.stockQty <= _criticalStockThreshold
-                  ? const Color(0xFF1D4ED8)
-                  : product.stockQty <= _lowStockThreshold
-                  ? const Color(0xFF38BDF8)
-                  : const Color(0xFF60A5FA);
+                    ? Theme.of(context).colorScheme.error
+                    : product.stockQty <= _criticalStockThreshold
+                    ? const Color(0xFF1D4ED8)
+                    : product.stockQty <= _lowStockThreshold
+                    ? const Color(0xFF38BDF8)
+                    : const Color(0xFF60A5FA);
 
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
@@ -3220,105 +3258,106 @@ class _InventoryTabState extends State<_InventoryTab> {
                         return KeyEventResult.ignored;
                       },
                       child: ListTile(
-                      minLeadingWidth: 62,
-                      title: Row(
-                        children: [
-                          Expanded(child: Text(product.name)),
-                          if (hasDgdaData)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(
-                                'DGDA',
-                                style: Theme.of(context).textTheme.labelSmall
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onPrimaryContainer,
-                                    ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      subtitle: Text(
-                        '${_categoryLabel(product.category)} • Buy ${_money(product.buyPrice)} • Sell ${_money(product.sellPrice)} • Stock ${_stockDisplay(product)}${product.dgdaGenericName == null || product.dgdaGenericName!.isEmpty ? '' : '\nGeneric: ${product.dgdaGenericName}'}${product.dgdaManufacturer == null || product.dgdaManufacturer!.isEmpty ? '' : '\nManufacturer: ${product.dgdaManufacturer}'}',
-                      ),
-                      isThreeLine:
-                          product.dgdaGenericName != null,
-                      leading: hasPackPiece
-                          ? _MedicineCountBadge(
-                              stockQty: product.stockQty,
-                              unitsPerPack: product.unitsPerPack,
-                              tone: stockColor,
-                            )
-                          : CircleAvatar(
-                              backgroundColor: stockColor.withValues(alpha: 0.15),
-                              child: Text(
-                                _stockShortDisplay(product),
-                                style: TextStyle(
-                                  color: stockColor,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                      trailing: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 230),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                        minLeadingWidth: 62,
+                        title: Row(
                           children: [
+                            Expanded(child: Text(product.name)),
                             if (hasDgdaData)
-                              IconButton(
-                                tooltip: 'DGDA details',
-                                onPressed: () => _showDgdaDataDialog(
-                                  title: product.name,
-                                  data: product.dgdaData,
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
                                 ),
-                                icon: const Icon(Icons.info_outline),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.primaryContainer,
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(
+                                  'DGDA',
+                                  style: Theme.of(context).textTheme.labelSmall
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onPrimaryContainer,
+                                      ),
+                                ),
                               ),
-                            TextButton.icon(
-                              onPressed: () => _showStockInDialog(product),
-                              icon: const Icon(Icons.add_box_outlined),
-                              label: const Text('Stock In'),
-                            ),
-                            PopupMenuButton<String>(
-                              onSelected: (value) {
-                                if (value == 'edit') {
-                                  _showProductDialog(product: product);
-                                }
-                                if (value == 'adjust') {
-                                  _showAdjustmentDialog(product);
-                                }
-                                if (value == 'delete') {
-                                  _deleteProduct(product);
-                                }
-                              },
-                              itemBuilder: (context) => const [
-                                PopupMenuItem(
-                                  value: 'edit',
-                                  child: Text('Edit'),
-                                ),
-                                PopupMenuItem(
-                                  value: 'adjust',
-                                  child: Text('Adjust Stock'),
-                                ),
-                                PopupMenuItem(
-                                  value: 'delete',
-                                  child: Text('Delete'),
-                                ),
-                              ],
-                            ),
                           ],
                         ),
-                      ),
+                        subtitle: Text(
+                          '${_categoryLabel(product.category)} • Buy ${_money(product.buyPrice)} • Sell ${_money(product.sellPrice)} • Stock ${_stockDisplay(product)}${product.dgdaGenericName == null || product.dgdaGenericName!.isEmpty ? '' : '\nGeneric: ${product.dgdaGenericName}'}${product.dgdaManufacturer == null || product.dgdaManufacturer!.isEmpty ? '' : '\nManufacturer: ${product.dgdaManufacturer}'}',
+                        ),
+                        isThreeLine: product.dgdaGenericName != null,
+                        leading: hasPackPiece
+                            ? _MedicineCountBadge(
+                                stockQty: product.stockQty,
+                                unitsPerPack: product.unitsPerPack,
+                                tone: stockColor,
+                              )
+                            : CircleAvatar(
+                                backgroundColor: stockColor.withValues(
+                                  alpha: 0.15,
+                                ),
+                                child: Text(
+                                  _stockShortDisplay(product),
+                                  style: TextStyle(
+                                    color: stockColor,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                        trailing: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 230),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (hasDgdaData)
+                                IconButton(
+                                  tooltip: 'DGDA details',
+                                  onPressed: () => _showDgdaDataDialog(
+                                    title: product.name,
+                                    data: product.dgdaData,
+                                  ),
+                                  icon: const Icon(Icons.info_outline),
+                                ),
+                              TextButton.icon(
+                                onPressed: () => _showStockInDialog(product),
+                                icon: const Icon(Icons.add_box_outlined),
+                                label: const Text('Stock In'),
+                              ),
+                              PopupMenuButton<String>(
+                                onSelected: (value) {
+                                  if (value == 'edit') {
+                                    _showProductDialog(product: product);
+                                  }
+                                  if (value == 'adjust') {
+                                    _showAdjustmentDialog(product);
+                                  }
+                                  if (value == 'delete') {
+                                    _deleteProduct(product);
+                                  }
+                                },
+                                itemBuilder: (context) => const [
+                                  PopupMenuItem(
+                                    value: 'edit',
+                                    child: Text('Edit'),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'adjust',
+                                    child: Text('Adjust Stock'),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'delete',
+                                    child: Text('Delete'),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -3412,9 +3451,9 @@ class _InventoryTabState extends State<_InventoryTab> {
                               final product = productsById[purchase.productId];
                               final title = product?.name ?? purchase.productId;
                               final hasPackPiece =
-                                product != null &&
-                                product.trackInPieces &&
-                                product.unitsPerPack > 1;
+                                  product != null &&
+                                  product.trackInPieces &&
+                                  product.unitsPerPack > 1;
                               final quantityLabel = product == null
                                   ? '${purchase.quantity} units'
                                   : _quantityDisplay(
@@ -3429,7 +3468,9 @@ class _InventoryTabState extends State<_InventoryTab> {
                                       ? _MedicineCountBadge(
                                           stockQty: purchase.quantity,
                                           unitsPerPack: product.unitsPerPack,
-                                          tone: Theme.of(context).colorScheme.primary,
+                                          tone: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
                                           compact: true,
                                         )
                                       : null,
@@ -3850,8 +3891,9 @@ class _BkashTabState extends State<_BkashTab> {
     }
 
     var selectedAccountId = _selectedAccountId ?? accounts.first.id;
-    String? selectedToAccountId =
-        accounts.length > 1 ? accounts.firstWhere((a) => a.id != selectedAccountId).id : null;
+    String? selectedToAccountId = accounts.length > 1
+        ? accounts.firstWhere((a) => a.id != selectedAccountId).id
+        : null;
     final amountController = TextEditingController();
     final chargeController = TextEditingController(text: '0');
     final noteController = TextEditingController();
@@ -3864,8 +3906,9 @@ class _BkashTabState extends State<_BkashTab> {
           builder: (context, setStateDialog) {
             final isTransfer = selectedType == BkashType.transfer;
             // Accounts selectable as destination (exclude source)
-            final destAccounts =
-                accounts.where((a) => a.id != selectedAccountId).toList();
+            final destAccounts = accounts
+                .where((a) => a.id != selectedAccountId)
+                .toList();
 
             return AlertDialog(
               title: const Text('Record bKash Transaction'),
@@ -3896,8 +3939,9 @@ class _BkashTabState extends State<_BkashTab> {
                               .toList();
                           if (selectedToAccountId == value ||
                               selectedToAccountId == null) {
-                            selectedToAccountId =
-                                destList.isNotEmpty ? destList.first.id : null;
+                            selectedToAccountId = destList.isNotEmpty
+                                ? destList.first.id
+                                : null;
                           }
                         });
                       },
@@ -3996,14 +4040,14 @@ class _BkashTabState extends State<_BkashTab> {
                         child: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF16A34A).withValues(
-                              alpha: 0.08,
-                            ),
+                            color: const Color(
+                              0xFF16A34A,
+                            ).withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: const Color(0xFF16A34A).withValues(
-                                alpha: 0.25,
-                              ),
+                              color: const Color(
+                                0xFF16A34A,
+                              ).withValues(alpha: 0.25),
                             ),
                           ),
                           child: const Row(
@@ -4198,7 +4242,11 @@ class _BkashTabState extends State<_BkashTab> {
                 ),
                 Chip(
                   label: Text(report.period),
-                  avatar: Icon(Icons.calendar_month_outlined, size: 16, color: scheme.primary),
+                  avatar: Icon(
+                    Icons.calendar_month_outlined,
+                    size: 16,
+                    color: scheme.primary,
+                  ),
                 ),
               ],
             ),
@@ -4232,9 +4280,9 @@ class _BkashTabState extends State<_BkashTab> {
             const SizedBox(height: 12),
             Text(
               'Cashflow Ratio',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 6),
             Row(
@@ -4245,7 +4293,9 @@ class _BkashTabState extends State<_BkashTab> {
                     child: LinearProgressIndicator(
                       value: inflowRatio,
                       minHeight: 10,
-                      valueColor: AlwaysStoppedAnimation<Color>(scheme.secondary),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        scheme.secondary,
+                      ),
                       backgroundColor: scheme.error.withValues(alpha: 0.2),
                     ),
                   ),
@@ -4342,7 +4392,9 @@ class _BkashTabState extends State<_BkashTab> {
                     _money(report.netChange),
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: report.netChange >= 0 ? scheme.secondary : scheme.error,
+                      color: report.netChange >= 0
+                          ? scheme.secondary
+                          : scheme.error,
                     ),
                   ),
                 ],
@@ -4422,9 +4474,8 @@ class _BkashTabState extends State<_BkashTab> {
                             children: [
                               Text(
                                 'Quick Insights',
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w700),
                               ),
                               const SizedBox(height: 12),
                               _DialogSummaryRow(
@@ -4633,23 +4684,21 @@ class _BkashTabState extends State<_BkashTab> {
     final outgoing = selectedAccount == null
         ? <BkashTransaction>[]
         : widget.controller.bkashTransactions
-            .where((item) => item.accountId == selectedAccount.id)
-            .toList();
+              .where((item) => item.accountId == selectedAccount.id)
+              .toList();
     // Incoming transfers where this account is the destination
     final incomingTransfers = selectedAccount == null
         ? <BkashTransaction>[]
         : widget.controller.bkashTransactions
-            .where(
-              (item) =>
-                  item.toAccountId == selectedAccount.id &&
-                  item.type == BkashType.transfer,
-            )
-            .toList();
+              .where(
+                (item) =>
+                    item.toAccountId == selectedAccount.id &&
+                    item.type == BkashType.transfer,
+              )
+              .toList();
     // Merge and sort by date descending
-    final transactions = [
-      ...outgoing,
-      ...incomingTransfers,
-    ]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final transactions = [...outgoing, ...incomingTransfers]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -4794,8 +4843,7 @@ class _BkashTabState extends State<_BkashTab> {
                         scrollDirection: Axis.horizontal,
                         child: Row(
                           children: accounts.map((account) {
-                            final isSelected =
-                                account.id == _selectedAccountId;
+                            final isSelected = account.id == _selectedAccountId;
                             return Padding(
                               padding: const EdgeInsets.only(right: 8),
                               child: FilterChip(
@@ -4817,9 +4865,9 @@ class _BkashTabState extends State<_BkashTab> {
                                 checkmarkColor: const Color(0xFFE2136E),
                                 side: BorderSide(
                                   color: isSelected
-                                      ? const Color(0xFFE2136E).withValues(
-                                          alpha: 0.5,
-                                        )
+                                      ? const Color(
+                                          0xFFE2136E,
+                                        ).withValues(alpha: 0.5)
                                       : Colors.transparent,
                                 ),
                               ),
@@ -4930,9 +4978,7 @@ class _BkashTabState extends State<_BkashTab> {
                             transaction.type == BkashType.transfer;
                         final sourceName = isIncoming
                             ? widget.controller.bkashAccounts
-                                  .where(
-                                    (a) => a.id == transaction.accountId,
-                                  )
+                                  .where((a) => a.id == transaction.accountId)
                                   .map((a) => a.name)
                                   .firstOrNull
                             : null;
@@ -5164,6 +5210,7 @@ class _BkashTransactionTile extends StatelessWidget {
   const _BkashTransactionTile({
     required this.transaction,
     required this.onDelete,
+
     /// When true this transaction is an incoming transfer to the viewed account.
     this.isIncomingTransfer = false,
     this.sourceAccountName,
@@ -5204,7 +5251,8 @@ class _BkashTransactionTile extends StatelessWidget {
         ? Icons.call_received_rounded
         : _icons[effectiveType] ?? Icons.monetization_on_outlined;
 
-    final isCredit = isIncomingTransfer ||
+    final isCredit =
+        isIncomingTransfer ||
         effectiveType == BkashType.cashIn ||
         effectiveType == BkashType.commission;
     final amountSign = isCredit ? '+' : '−';
@@ -5305,17 +5353,13 @@ class _BkashTransactionTile extends StatelessWidget {
                               Text(
                                 _dateTimeLabel(transaction.createdAt),
                                 style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(
-                                      color: scheme.onSurfaceVariant,
-                                    ),
+                                    ?.copyWith(color: scheme.onSurfaceVariant),
                               ),
                               if (isIncomingTransfer &&
                                   sourceAccountName != null)
                                 Text(
                                   'From: $sourceAccountName',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
+                                  style: Theme.of(context).textTheme.bodySmall
                                       ?.copyWith(
                                         color: color.withValues(alpha: 0.85),
                                         fontWeight: FontWeight.w600,
@@ -5327,9 +5371,7 @@ class _BkashTransactionTile extends StatelessWidget {
                                   padding: const EdgeInsets.only(top: 2),
                                   child: Text(
                                     transaction.note!,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
+                                    style: Theme.of(context).textTheme.bodySmall
                                         ?.copyWith(
                                           color: scheme.onSurfaceVariant
                                               .withValues(alpha: 0.8),
@@ -5409,7 +5451,8 @@ class _ReportsTabState extends State<_ReportsTab> {
   Widget build(BuildContext context) {
     final report = widget.controller.dashboardReport;
     final productNames = <String, String>{
-      for (final product in widget.controller.products) product.id!: product.name,
+      for (final product in widget.controller.products)
+        product.id!: product.name,
     };
 
     return LayoutBuilder(
@@ -5458,7 +5501,9 @@ class _ReportsTabState extends State<_ReportsTab> {
                   OutlinedButton.icon(
                     onPressed: widget.onPickDate,
                     icon: const Icon(Icons.calendar_today),
-                    label: Text(widget.controller.reportWindow?.label ?? 'Pick Date'),
+                    label: Text(
+                      widget.controller.reportWindow?.label ?? 'Pick Date',
+                    ),
                   ),
                 ],
               ),
@@ -5556,9 +5601,8 @@ class _ReportsTabState extends State<_ReportsTab> {
                         Expanded(
                           child: Text(
                             'Net P/L = Gross Profit - Due Amount - Inventory Loss + bKash Commission',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(fontWeight: FontWeight.w600),
                           ),
                         ),
                       ],
@@ -5581,7 +5625,8 @@ class _ReportsTabState extends State<_ReportsTab> {
                   (adjustment) => Card(
                     child: ListTile(
                       title: Text(
-                        productNames[adjustment.productId] ?? adjustment.productId,
+                        productNames[adjustment.productId] ??
+                            adjustment.productId,
                       ),
                       subtitle: Text(
                         '${adjustment.reason} • Qty ${adjustment.deltaQty} • ${_dateTimeLabel(adjustment.createdAt)}',
@@ -5661,7 +5706,11 @@ class _ReportTrendCard extends StatelessWidget {
                       label: Text('Wallet'),
                     ),
                   ],
-                  selected: {_ReportMetric.values.firstWhere((metric) => metric == selectedMetric)},
+                  selected: {
+                    _ReportMetric.values.firstWhere(
+                      (metric) => metric == selectedMetric,
+                    ),
+                  },
                   onSelectionChanged: (selection) {
                     onMetricChanged(selection.first);
                   },
@@ -5693,7 +5742,10 @@ class _BarSeriesChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final maxAbs = points
         .map((point) => point.value.abs())
-        .fold<double>(1, (previous, element) => element > previous ? element : previous);
+        .fold<double>(
+          1,
+          (previous, element) => element > previous ? element : previous,
+        );
 
     final scheme = Theme.of(context).colorScheme;
 
@@ -6002,9 +6054,7 @@ class _QuickActionTile extends StatelessWidget {
               decoration: BoxDecoration(
                 color: scheme.surfaceContainerLowest,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: color.withValues(alpha: 0.22),
-                ),
+                border: Border.all(color: color.withValues(alpha: 0.22)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -6049,14 +6099,17 @@ class _StockAlertTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isOut = product.stockQty == 0;
-    final isCritical =
-        product.stockQty <= _criticalStockThreshold && !isOut;
+    final isCritical = product.stockQty <= _criticalStockThreshold && !isOut;
     final color = isOut
-      ? Theme.of(context).colorScheme.error
-      : isCritical
-      ? const Color(0xFF1D4ED8)
-      : const Color(0xFF38BDF8);
-    final label = isOut ? 'OUT' : isCritical ? 'CRITICAL' : 'LOW';
+        ? Theme.of(context).colorScheme.error
+        : isCritical
+        ? const Color(0xFF1D4ED8)
+        : const Color(0xFF38BDF8);
+    final label = isOut
+        ? 'OUT'
+        : isCritical
+        ? 'CRITICAL'
+        : 'LOW';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
@@ -6070,10 +6123,7 @@ class _StockAlertTile extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 7,
-                vertical: 3,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.14),
                 borderRadius: BorderRadius.circular(6),
@@ -6092,9 +6142,9 @@ class _StockAlertTile extends StatelessWidget {
             Expanded(
               child: Text(
                 product.name,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
             const SizedBox(width: 8),
@@ -6197,17 +6247,17 @@ class _EmptyStateCard extends StatelessWidget {
           const SizedBox(height: 14),
           Text(
             title,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 6),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: scheme.onSurfaceVariant,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
           ),
         ],
       ),
@@ -6281,15 +6331,15 @@ class _FinanceKpiChip extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
               Text(
                 value,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
               ),
             ],
           ),
@@ -6324,7 +6374,9 @@ class _HoverLiftState extends State<_HoverLift> {
           boxShadow: _hovered
               ? [
                   BoxShadow(
-                    color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.04),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.shadow.withValues(alpha: 0.04),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),
