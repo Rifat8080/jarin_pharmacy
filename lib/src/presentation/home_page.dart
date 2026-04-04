@@ -35,6 +35,7 @@ String _bkashTypeLabel(BkashType type) {
     BkashType.sendMoney => 'Send Money',
     BkashType.billPayment => 'Bill Payment',
     BkashType.commission => 'Commission',
+    BkashType.transfer => 'Transfer',
   };
 }
 
@@ -3580,6 +3581,7 @@ class _BkashTabState extends State<_BkashTab> {
     BkashType.cashOut,
     BkashType.sendMoney,
     BkashType.billPayment,
+    BkashType.transfer,
   ];
 
   String? _selectedAccountId;
@@ -3848,6 +3850,8 @@ class _BkashTabState extends State<_BkashTab> {
     }
 
     var selectedAccountId = _selectedAccountId ?? accounts.first.id;
+    String? selectedToAccountId =
+        accounts.length > 1 ? accounts.firstWhere((a) => a.id != selectedAccountId).id : null;
     final amountController = TextEditingController();
     final chargeController = TextEditingController(text: '0');
     final noteController = TextEditingController();
@@ -3858,6 +3862,11 @@ class _BkashTabState extends State<_BkashTab> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setStateDialog) {
+            final isTransfer = selectedType == BkashType.transfer;
+            // Accounts selectable as destination (exclude source)
+            final destAccounts =
+                accounts.where((a) => a.id != selectedAccountId).toList();
+
             return AlertDialog(
               title: const Text('Record bKash Transaction'),
               content: SingleChildScrollView(
@@ -3866,7 +3875,9 @@ class _BkashTabState extends State<_BkashTab> {
                   children: [
                     DropdownButtonFormField<String>(
                       initialValue: selectedAccountId,
-                      decoration: const InputDecoration(labelText: 'Account'),
+                      decoration: InputDecoration(
+                        labelText: isTransfer ? 'From Account' : 'Account',
+                      ),
                       items: accounts
                           .map(
                             (account) => DropdownMenuItem<String>(
@@ -3876,11 +3887,18 @@ class _BkashTabState extends State<_BkashTab> {
                           )
                           .toList(),
                       onChanged: (value) {
-                        if (value == null) {
-                          return;
-                        }
+                        if (value == null) return;
                         setStateDialog(() {
                           selectedAccountId = value;
+                          // Reset toAccount if it's now the same as source
+                          final destList = accounts
+                              .where((a) => a.id != value)
+                              .toList();
+                          if (selectedToAccountId == value ||
+                              selectedToAccountId == null) {
+                            selectedToAccountId =
+                                destList.isNotEmpty ? destList.first.id : null;
+                          }
                         });
                       },
                     ),
@@ -3897,14 +3915,51 @@ class _BkashTabState extends State<_BkashTab> {
                           )
                           .toList(),
                       onChanged: (value) {
-                        if (value == null) {
-                          return;
-                        }
+                        if (value == null) return;
                         setStateDialog(() {
                           selectedType = value;
                         });
                       },
                     ),
+                    // Show "To Account" only when type is transfer
+                    if (isTransfer) ...[
+                      const SizedBox(height: 12),
+                      destAccounts.isEmpty
+                          ? Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.orange.shade200,
+                                ),
+                              ),
+                              child: const Text(
+                                'Add at least 2 accounts to use transfers.',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                            )
+                          : DropdownButtonFormField<String>(
+                              initialValue: selectedToAccountId,
+                              decoration: const InputDecoration(
+                                labelText: 'To Account',
+                              ),
+                              items: destAccounts
+                                  .map(
+                                    (account) => DropdownMenuItem<String>(
+                                      value: account.id,
+                                      child: Text(account.name),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) {
+                                if (value == null) return;
+                                setStateDialog(
+                                  () => selectedToAccountId = value,
+                                );
+                              },
+                            ),
+                    ],
                     const SizedBox(height: 12),
                     TextField(
                       controller: amountController,
@@ -3934,6 +3989,44 @@ class _BkashTabState extends State<_BkashTab> {
                         labelText: 'Note (optional)',
                       ),
                     ),
+                    // Inline hint for Cash In
+                    if (selectedType == BkashType.cashIn)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF16A34A).withValues(
+                              alpha: 0.08,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: const Color(0xFF16A34A).withValues(
+                                alpha: 0.25,
+                              ),
+                            ),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                size: 14,
+                                color: Color(0xFF16A34A),
+                              ),
+                              SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Cash In adds to bKash wallet and deducts from cash on hand.',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF16A34A),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -3953,13 +4046,18 @@ class _BkashTabState extends State<_BkashTab> {
       },
     );
 
-    if (confirmed != true) {
-      return;
-    }
+    if (confirmed != true) return;
 
     final amount = double.tryParse(amountController.text.trim());
     final charge = double.tryParse(chargeController.text.trim());
-    if (amount == null || charge == null) {
+    if (amount == null || charge == null) return;
+
+    // Validate transfer has a destination
+    if (selectedType == BkashType.transfer && selectedToAccountId == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a destination account.')),
+      );
       return;
     }
 
@@ -3972,17 +4070,14 @@ class _BkashTabState extends State<_BkashTab> {
         note: noteController.text.trim().isEmpty
             ? null
             : noteController.text.trim(),
+        toAccountId: selectedType == BkashType.transfer
+            ? selectedToAccountId
+            : null,
       );
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _selectedAccountId = selectedAccountId;
-      });
+      if (!mounted) return;
+      setState(() => _selectedAccountId = selectedAccountId);
     } catch (error) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to save bKash entry: $error')),
       );
@@ -4450,6 +4545,7 @@ class _BkashTabState extends State<_BkashTab> {
             orElse: () => accounts.first,
           );
 
+    // ── Reports view ──
     if (_showReports) {
       return Padding(
         padding: const EdgeInsets.all(16),
@@ -4459,9 +4555,7 @@ class _BkashTabState extends State<_BkashTab> {
             Row(
               children: [
                 TextButton.icon(
-                  onPressed: () {
-                    setState(() => _showReports = false);
-                  },
+                  onPressed: () => setState(() => _showReports = false),
                   icon: const Icon(Icons.arrow_back),
                   label: const Text('Back to Transactions'),
                 ),
@@ -4480,30 +4574,22 @@ class _BkashTabState extends State<_BkashTab> {
                 FilterChip(
                   label: const Text('Daily'),
                   selected: _reportPeriod == 'daily',
-                  onSelected: (_) {
-                    setState(() => _reportPeriod = 'daily');
-                  },
+                  onSelected: (_) => setState(() => _reportPeriod = 'daily'),
                 ),
                 FilterChip(
                   label: const Text('Weekly'),
                   selected: _reportPeriod == 'weekly',
-                  onSelected: (_) {
-                    setState(() => _reportPeriod = 'weekly');
-                  },
+                  onSelected: (_) => setState(() => _reportPeriod = 'weekly'),
                 ),
                 FilterChip(
                   label: const Text('Monthly'),
                   selected: _reportPeriod == 'monthly',
-                  onSelected: (_) {
-                    setState(() => _reportPeriod = 'monthly');
-                  },
+                  onSelected: (_) => setState(() => _reportPeriod = 'monthly'),
                 ),
                 FilterChip(
                   label: const Text('Yearly'),
                   selected: _reportPeriod == 'yearly',
-                  onSelected: (_) {
-                    setState(() => _reportPeriod = 'yearly');
-                  },
+                  onSelected: (_) => setState(() => _reportPeriod = 'yearly'),
                 ),
               ],
             ),
@@ -4521,12 +4607,8 @@ class _BkashTabState extends State<_BkashTab> {
                     )
                     .toList(),
                 onChanged: (value) {
-                  if (value == null) {
-                    return;
-                  }
-                  setState(() {
-                    _selectedAccountId = value;
-                  });
+                  if (value == null) return;
+                  setState(() => _selectedAccountId = value);
                 },
               ),
             if (accounts.isNotEmpty) const SizedBox(height: 12),
@@ -4543,142 +4625,770 @@ class _BkashTabState extends State<_BkashTab> {
       );
     }
 
-    // Original transactions view
-    final transactions = selectedAccount == null
+    // ── Transactions view ──
+    // Cash = sum of ALL accounts; bKash = per selected account
+    final totalCash = accounts.fold(0.0, (sum, a) => sum + a.cashBalance);
+
+    // Outgoing transactions for this account
+    final outgoing = selectedAccount == null
         ? <BkashTransaction>[]
         : widget.controller.bkashTransactions
-              .where((item) => item.accountId == selectedAccount.id)
-              .toList();
+            .where((item) => item.accountId == selectedAccount.id)
+            .toList();
+    // Incoming transfers where this account is the destination
+    final incomingTransfers = selectedAccount == null
+        ? <BkashTransaction>[]
+        : widget.controller.bkashTransactions
+            .where(
+              (item) =>
+                  item.toAccountId == selectedAccount.id &&
+                  item.type == BkashType.transfer,
+            )
+            .toList();
+    // Merge and sort by date descending
+    final transactions = [
+      ...outgoing,
+      ...incomingTransfers,
+    ]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              OutlinedButton.icon(
-                onPressed: _showAddAccountDialog,
-                icon: const Icon(Icons.account_balance_wallet_outlined),
-                label: const Text('Add Account'),
-              ),
-              const SizedBox(width: 8),
-              FilledButton.icon(
-                onPressed: _showBkashDialog,
-                icon: const Icon(Icons.add),
-                label: const Text('Record bKash'),
-              ),
-              const SizedBox(width: 8),
-              FilledButton.icon(
-                onPressed: () {
-                  setState(() => _showReports = true);
-                },
-                icon: const Icon(Icons.assessment_outlined),
-                label: const Text('Reports'),
-              ),
-              const SizedBox(width: 16),
-              if (selectedAccount != null)
-                Expanded(
-                  child: Text(
-                    '${selectedAccount.name} • bKash ${_money(selectedAccount.bkashBalance)} • Cash ${_money(selectedAccount.cashBalance)}',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Branded gradient header ──
+            Container(
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFFBE185D),
+                    Color(0xFFE2136E),
+                    Color(0xFFF06292),
+                  ],
                 ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (accounts.isNotEmpty)
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _selectedAccountId,
-                    decoration: const InputDecoration(
-                      labelText: 'View Account',
+              ),
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title row
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.20),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.account_balance_wallet_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'bKash',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 22,
+                          letterSpacing: -0.4,
+                        ),
+                      ),
+                      const Spacer(),
+                      // Action buttons – compact icons on narrow screens
+                      if (constraints.maxWidth < 500) ...[
+                        _BkashHeaderIconBtn(
+                          icon: Icons.add_rounded,
+                          tooltip: 'Record bKash',
+                          onTap: _showBkashDialog,
+                        ),
+                        const SizedBox(width: 4),
+                        _BkashHeaderIconBtn(
+                          icon: Icons.account_balance_wallet_outlined,
+                          tooltip: 'Add Account',
+                          onTap: _showAddAccountDialog,
+                        ),
+                        const SizedBox(width: 4),
+                        _BkashHeaderIconBtn(
+                          icon: Icons.assessment_outlined,
+                          tooltip: 'Reports',
+                          onTap: () => setState(() => _showReports = true),
+                        ),
+                      ] else ...[
+                        _BkashHeaderBtn(
+                          icon: Icons.add_rounded,
+                          label: 'Record',
+                          onTap: _showBkashDialog,
+                          filled: true,
+                        ),
+                        const SizedBox(width: 8),
+                        _BkashHeaderBtn(
+                          icon: Icons.account_balance_wallet_outlined,
+                          label: 'Add Account',
+                          onTap: _showAddAccountDialog,
+                        ),
+                        const SizedBox(width: 8),
+                        _BkashHeaderBtn(
+                          icon: Icons.assessment_outlined,
+                          label: 'Reports',
+                          onTap: () => setState(() => _showReports = true),
+                        ),
+                      ],
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Balance pills: Total Cash (all accounts) + per-account bKash
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        // Total Cash = sum of all accounts
+                        _BkashBalancePill(
+                          label: 'Total Cash',
+                          amount: _money(totalCash),
+                          icon: Icons.payments_rounded,
+                          color: const Color(0xFF4ADE80),
+                          highlight: true,
+                        ),
+                        ...accounts.map((account) {
+                          final isSelected = account.id == _selectedAccountId;
+                          return Padding(
+                            padding: const EdgeInsets.only(left: 10),
+                            child: GestureDetector(
+                              onTap: () => setState(
+                                () => _selectedAccountId = account.id,
+                              ),
+                              child: _BkashBalancePill(
+                                label: '${account.name} bKash',
+                                amount: _money(account.bkashBalance),
+                                icon: Icons.account_balance_wallet_rounded,
+                                color: const Color(0xFFFBCFE8),
+                                highlight: isSelected,
+                                selected: isSelected,
+                              ),
+                            ),
+                          );
+                        }),
+                      ],
                     ),
-                    items: accounts
-                        .map(
-                          (account) => DropdownMenuItem<String>(
-                            value: account.id,
-                            child: Text(account.name),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      if (value == null) {
-                        return;
-                      }
-                      setState(() {
-                        _selectedAccountId = value;
-                      });
-                    },
                   ),
-                ),
-                const SizedBox(width: 8),
-                if (selectedAccount != null)
-                  IconButton(
-                    icon: const Icon(Icons.edit),
-                    tooltip: 'Edit account',
-                    onPressed: () => _showEditAccountDialog(selectedAccount),
-                  ),
-                if (selectedAccount != null)
-                  IconButton(
-                    icon: const Icon(Icons.delete),
-                    tooltip: 'Delete account',
-                    onPressed: () => _showDeleteAccountDialog(selectedAccount),
-                  ),
-              ],
+                ],
+              ),
             ),
-          if (accounts.isNotEmpty) const SizedBox(height: 12),
-          Expanded(
-            child: accounts.isEmpty
-                ? const _EmptyStateCard(
-                    title: 'No bKash accounts',
-                    message:
-                        'Create bKash accounts with current balances to start recording transactions.',
-                  )
-                : transactions.isEmpty
-                ? const _EmptyStateCard(
-                    title: 'No bKash entries',
-                    message:
-                        'Record Cash In, Cash Out, Send Money, and Bill Payment for this account.',
-                  )
-                : ListView.separated(
-                    itemCount: transactions.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 4),
-                    itemBuilder: (context, index) {
-                      final transaction = transactions[index];
-                      return Card(
-                        child: ListTile(
-                          title: Text(_bkashTypeLabel(transaction.type)),
-                          subtitle: Text(
-                            '${_dateTimeLabel(transaction.createdAt)} • Amount ${_money(transaction.amount)} • Charge ${_money(transaction.charge)}',
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                _money(transaction.netAmount),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
+
+            // ── Account selector chips ──
+            if (accounts.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 8, 0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: accounts.map((account) {
+                            final isSelected =
+                                account.id == _selectedAccountId;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: FilterChip(
+                                label: Text(account.name),
+                                selected: isSelected,
+                                onSelected: (_) => setState(
+                                  () => _selectedAccountId = account.id,
+                                ),
+                                avatar: Icon(
+                                  Icons.account_balance_wallet_outlined,
+                                  size: 15,
+                                  color: isSelected
+                                      ? const Color(0xFFE2136E)
+                                      : null,
+                                ),
+                                selectedColor: const Color(
+                                  0xFFE2136E,
+                                ).withValues(alpha: 0.12),
+                                checkmarkColor: const Color(0xFFE2136E),
+                                side: BorderSide(
+                                  color: isSelected
+                                      ? const Color(0xFFE2136E).withValues(
+                                          alpha: 0.5,
+                                        )
+                                      : Colors.transparent,
                                 ),
                               ),
-                              IconButton(
-                                onPressed: () => _deleteBkash(transaction),
-                                icon: const Icon(Icons.delete_outline),
-                              ),
-                            ],
-                          ),
+                            );
+                          }).toList(),
                         ),
-                      );
-                    },
+                      ),
+                    ),
+                    if (selectedAccount != null) ...[
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        tooltip: 'Edit account',
+                        onPressed: () =>
+                            _showEditAccountDialog(selectedAccount),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        tooltip: 'Delete account',
+                        color: Theme.of(context).colorScheme.error,
+                        onPressed: () =>
+                            _showDeleteAccountDialog(selectedAccount),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+            // Per-account balance summary row
+            if (selectedAccount != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 6, 14, 0),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
                   ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE2136E).withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFFE2136E).withValues(alpha: 0.15),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.account_balance_wallet_outlined,
+                        size: 15,
+                        color: Color(0xFFE2136E),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          selectedAccount.name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      _BalanceBadge(
+                        label: 'bKash',
+                        amount: _money(selectedAccount.bkashBalance),
+                        color: const Color(0xFFE2136E),
+                      ),
+                      const SizedBox(width: 10),
+                      _BalanceBadge(
+                        label: 'Cash',
+                        amount: _money(selectedAccount.cashBalance),
+                        color: const Color(0xFF16A34A),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            const SizedBox(height: 8),
+
+            // ── Transaction list ──
+            Expanded(
+              child: accounts.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: _EmptyStateCard(
+                        title: 'No bKash accounts',
+                        message:
+                            'Create bKash accounts with current balances to start recording transactions.',
+                      ),
+                    )
+                  : transactions.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: _EmptyStateCard(
+                        title: 'No bKash entries',
+                        message:
+                            'Record Cash In, Cash Out, Send Money, and Bill Payment for this account.',
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+                      itemCount: transactions.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 6),
+                      itemBuilder: (context, index) {
+                        final transaction = transactions[index];
+                        final isIncoming =
+                            transaction.toAccountId == selectedAccount?.id &&
+                            transaction.type == BkashType.transfer;
+                        final sourceName = isIncoming
+                            ? widget.controller.bkashAccounts
+                                  .where(
+                                    (a) => a.id == transaction.accountId,
+                                  )
+                                  .map((a) => a.name)
+                                  .firstOrNull
+                            : null;
+                        return _BkashTransactionTile(
+                          transaction: transaction,
+                          isIncomingTransfer: isIncoming,
+                          sourceAccountName: sourceName,
+                          onDelete: isIncoming
+                              ? () {} // incoming transfers cannot be deleted from dest
+                              : () => _deleteBkash(transaction),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// bKash UI helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Compact icon button shown in the bKash header on narrow screens.
+class _BkashHeaderIconBtn extends StatelessWidget {
+  const _BkashHeaderIconBtn({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: Colors.white, size: 18),
+        ),
+      ),
+    );
+  }
+}
+
+/// Text button shown in the bKash header on wider screens.
+class _BkashHeaderBtn extends StatelessWidget {
+  const _BkashHeaderBtn({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.filled = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: filled
+              ? Colors.white.withValues(alpha: 0.28)
+              : Colors.white.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(10),
+          border: filled
+              ? null
+              : Border.all(color: Colors.white.withValues(alpha: 0.30)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.white, size: 15),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Pill widget showing a balance amount in the bKash header.
+class _BkashBalancePill extends StatelessWidget {
+  const _BkashBalancePill({
+    required this.label,
+    required this.amount,
+    required this.icon,
+    required this.color,
+    this.highlight = false,
+    this.selected = false,
+  });
+
+  final String label;
+  final String amount;
+  final IconData icon;
+  final Color color;
+  final bool highlight;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 160),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: highlight
+            ? Colors.white.withValues(alpha: 0.28)
+            : Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: selected
+              ? Colors.white.withValues(alpha: 0.70)
+              : Colors.white.withValues(alpha: 0.25),
+          width: selected ? 1.5 : 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 17),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.78),
+                  fontWeight: FontWeight.w500,
+                  fontSize: 11,
+                ),
+              ),
+              Text(
+                amount,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                  letterSpacing: -0.3,
+                  height: 1.2,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 }
+
+/// Small inline badge showing a labelled monetary value.
+class _BalanceBadge extends StatelessWidget {
+  const _BalanceBadge({
+    required this.label,
+    required this.amount,
+    required this.color,
+  });
+
+  final String label;
+  final String amount;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: RichText(
+        text: TextSpan(
+          style: DefaultTextStyle.of(context).style,
+          children: [
+            TextSpan(
+              text: '$label  ',
+              style: TextStyle(
+                fontSize: 10,
+                color: color.withValues(alpha: 0.75),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            TextSpan(
+              text: amount,
+              style: TextStyle(
+                fontSize: 13,
+                color: color,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Styled tile for a single bKash transaction entry.
+class _BkashTransactionTile extends StatelessWidget {
+  const _BkashTransactionTile({
+    required this.transaction,
+    required this.onDelete,
+    /// When true this transaction is an incoming transfer to the viewed account.
+    this.isIncomingTransfer = false,
+    this.sourceAccountName,
+  });
+
+  final BkashTransaction transaction;
+  final VoidCallback onDelete;
+  final bool isIncomingTransfer;
+  final String? sourceAccountName;
+
+  static const _colors = {
+    BkashType.cashIn: Color(0xFF16A34A),
+    BkashType.cashOut: Color(0xFFDC2626),
+    BkashType.sendMoney: Color(0xFFEA580C),
+    BkashType.billPayment: Color(0xFF7C3AED),
+    BkashType.commission: Color(0xFF2563EB),
+    BkashType.transfer: Color(0xFF0891B2),
+  };
+
+  static const _icons = {
+    BkashType.cashIn: Icons.arrow_downward_rounded,
+    BkashType.cashOut: Icons.arrow_upward_rounded,
+    BkashType.sendMoney: Icons.send_rounded,
+    BkashType.billPayment: Icons.receipt_long_rounded,
+    BkashType.commission: Icons.stars_rounded,
+    BkashType.transfer: Icons.swap_horiz_rounded,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    // For incoming transfers, show as teal "Transfer In"
+    final effectiveType = transaction.type;
+    final color = isIncomingTransfer
+        ? const Color(0xFF0E9F6E)
+        : _colors[effectiveType] ?? scheme.primary;
+    final iconData = isIncomingTransfer
+        ? Icons.call_received_rounded
+        : _icons[effectiveType] ?? Icons.monetization_on_outlined;
+
+    final isCredit = isIncomingTransfer ||
+        effectiveType == BkashType.cashIn ||
+        effectiveType == BkashType.commission;
+    final amountSign = isCredit ? '+' : '−';
+    final label = isIncomingTransfer
+        ? 'Transfer In'
+        : _bkashTypeLabel(effectiveType);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.6)),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.shadow.withValues(alpha: 0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            // Colored side accent + icon
+            Container(
+              width: 48,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.10),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  bottomLeft: Radius.circular(12),
+                ),
+              ),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.16),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(iconData, color: color, size: 16),
+                ),
+              ),
+            ),
+            // Main content
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Type chip
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              color: color,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ),
+                        // Net amount
+                        Text(
+                          '$amountSign${_money(transaction.amount)}',
+                          style: TextStyle(
+                            color: color,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _dateTimeLabel(transaction.createdAt),
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                              ),
+                              if (isIncomingTransfer &&
+                                  sourceAccountName != null)
+                                Text(
+                                  'From: $sourceAccountName',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: color.withValues(alpha: 0.85),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                ),
+                              if (transaction.note != null &&
+                                  transaction.note!.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Text(
+                                    transaction.note!,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          color: scheme.onSurfaceVariant
+                                              .withValues(alpha: 0.8),
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Charge badge
+                        if (transaction.charge > 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: scheme.errorContainer.withValues(
+                                alpha: 0.5,
+                              ),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'Charge ${_money(transaction.charge)}',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: scheme.error,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Delete button
+            IconButton(
+              onPressed: onDelete,
+              icon: Icon(
+                Icons.delete_outline,
+                size: 18,
+                color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+              ),
+              tooltip: 'Delete',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 enum _ReportMetric { performance, risk, wallet }
 

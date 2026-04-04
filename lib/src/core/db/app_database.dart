@@ -12,7 +12,7 @@ class AppDatabase {
   static const String walkInCustomerId = 'customer-walkin-default';
   static const String walkInCustomerName = 'Walk-in customer';
   static const String _databaseName = 'jarin_pharmacy.db';
-  static const int _databaseVersion = 12;
+  static const int _databaseVersion = 13;
 
   Database? _database;
   Future<Database>? _openingDatabase;
@@ -100,6 +100,15 @@ class AppDatabase {
     if (oldVersion < 12) {
       await _migrateAuthTables(db);
     }
+    if (oldVersion < 13) {
+      await _migrateBkashTransferColumn(db);
+    }
+  }
+
+  Future<void> _migrateBkashTransferColumn(Database db) async {
+    await db.execute(
+      'ALTER TABLE bkash_transactions ADD COLUMN to_account_id TEXT REFERENCES bkash_accounts(id)',
+    );
   }
 
   Future<void> _migrateAuthTables(Database db) async {
@@ -817,7 +826,9 @@ class AppDatabase {
         net_amount REAL NOT NULL,
         created_at TEXT NOT NULL,
         note TEXT,
-        FOREIGN KEY(account_id) REFERENCES bkash_accounts(id)
+        to_account_id TEXT,
+        FOREIGN KEY(account_id) REFERENCES bkash_accounts(id),
+        FOREIGN KEY(to_account_id) REFERENCES bkash_accounts(id)
       )
     ''');
 

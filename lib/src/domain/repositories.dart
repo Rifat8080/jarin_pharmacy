@@ -829,6 +829,7 @@ class TransactionRepository {
     required double charge,
     required DateTime date,
     String? note,
+    String? toAccountId,
   }) async {
     final db = await _database.database;
     final id = _uuid.v4();
@@ -839,6 +840,7 @@ class TransactionRepository {
       BkashType.sendMoney => -amount,
       BkashType.billPayment => -amount,
       BkashType.commission => 0.0,
+      BkashType.transfer => -(amount + charge),
     };
 
     await db.transaction((txn) async {
@@ -851,6 +853,14 @@ class TransactionRepository {
         reverse: false,
       );
 
+      // For transfers: credit the destination account.
+      if (type == BkashType.transfer && toAccountId != null) {
+        await txn.rawUpdate(
+          'UPDATE bkash_accounts SET bkash_balance = bkash_balance + ? WHERE id = ?',
+          [amount, toAccountId],
+        );
+      }
+
       await txn.insert('bkash_transactions', {
         'id': id,
         'account_id': accountId,
@@ -860,6 +870,7 @@ class TransactionRepository {
         'net_amount': netAmount,
         'created_at': date.toIso8601String(),
         'note': note,
+        'to_account_id': toAccountId,
       });
     });
 
@@ -872,6 +883,7 @@ class TransactionRepository {
       netAmount: netAmount,
       createdAt: date,
       note: note,
+      toAccountId: toAccountId,
     );
   }
 
@@ -883,6 +895,7 @@ class TransactionRepository {
     required double charge,
     DateTime? date,
     String? note,
+    String? toAccountId,
   }) async {
     final db = await _database.database;
     final existing = await getBkashById(bkashId);
@@ -896,9 +909,11 @@ class TransactionRepository {
       BkashType.sendMoney => -amount,
       BkashType.billPayment => -amount,
       BkashType.commission => 0.0,
+      BkashType.transfer => -(amount + charge),
     };
 
     await db.transaction((txn) async {
+      // Reverse old impacts.
       await _applyBkashAccountImpact(
         txn: txn,
         accountId: existing.accountId,
@@ -907,7 +922,15 @@ class TransactionRepository {
         charge: existing.charge,
         reverse: true,
       );
+      if (existing.type == BkashType.transfer &&
+          existing.toAccountId != null) {
+        await txn.rawUpdate(
+          'UPDATE bkash_accounts SET bkash_balance = bkash_balance - ? WHERE id = ?',
+          [existing.amount, existing.toAccountId],
+        );
+      }
 
+      // Apply new impacts.
       await _applyBkashAccountImpact(
         txn: txn,
         accountId: accountId,
@@ -916,6 +939,12 @@ class TransactionRepository {
         charge: charge,
         reverse: false,
       );
+      if (type == BkashType.transfer && toAccountId != null) {
+        await txn.rawUpdate(
+          'UPDATE bkash_accounts SET bkash_balance = bkash_balance + ? WHERE id = ?',
+          [amount, toAccountId],
+        );
+      }
 
       await txn.update(
         'bkash_transactions',
@@ -927,6 +956,7 @@ class TransactionRepository {
           'net_amount': netAmount,
           'created_at': (date ?? existing.createdAt).toIso8601String(),
           'note': note,
+          'to_account_id': toAccountId,
         },
         where: 'id = ?',
         whereArgs: [bkashId],
@@ -950,6 +980,15 @@ class TransactionRepository {
         charge: existing.charge,
         reverse: true,
       );
+
+      // For transfers: also reverse the destination credit.
+      if (existing.type == BkashType.transfer &&
+          existing.toAccountId != null) {
+        await txn.rawUpdate(
+          'UPDATE bkash_accounts SET bkash_balance = bkash_balance - ? WHERE id = ?',
+          [existing.amount, existing.toAccountId],
+        );
+      }
 
       await txn.delete(
         'bkash_transactions',
@@ -1102,8 +1141,10 @@ class TransactionRepository {
 
     switch (type) {
       case BkashType.cashIn:
+        // Cash In: physical cash is deposited into the bKash wallet.
+        // bKash balance increases; cash on hand decreases.
         deltaBkash = amount;
-        deltaCash = 0;
+        deltaCash = -(amount + charge);
         break;
       case BkashType.sendMoney:
       case BkashType.billPayment:
@@ -1117,6 +1158,12 @@ class TransactionRepository {
       case BkashType.commission:
         deltaBkash = 0;
         deltaCash = amount;
+        break;
+      case BkashType.transfer:
+        // Source account: bKash decreases (amount + charge).
+        // Destination account balance is updated separately.
+        deltaBkash = -(amount + charge);
+        deltaCash = 0;
         break;
     }
 
@@ -1325,13 +1372,20 @@ class TransactionRepository {
     double openingBkashBalance = account.bkashBalance;
     double openingCashBalance = account.cashBalance;
 
-    // Calculate opening balances by reversing all transactions before this period
+    // Also reverse any incoming transfers (where this is the destination).
+    final incomingBeforePeriod = await db.query(
+      'bkash_transactions',
+      where: "to_account_id = ? AND created_at < ? AND type = 'transfer'",
+      whereArgs: [accountId, startDate.toIso8601String()],
+    );
+
+    // Calculate opening balances by reversing all transactions before this period.
     for (final row in beforePeriodTransactions) {
       final txn = BkashTransaction.fromMap(row);
       switch (txn.type) {
         case BkashType.cashIn:
           openingBkashBalance -= txn.amount;
-          openingCashBalance -= 0;
+          openingCashBalance += (txn.amount + txn.charge); // reverse cash deduction
           break;
         case BkashType.cashOut:
         case BkashType.sendMoney:
@@ -1342,13 +1396,28 @@ class TransactionRepository {
         case BkashType.commission:
           openingCashBalance -= txn.amount;
           break;
+        case BkashType.transfer:
+          openingBkashBalance += (txn.amount + txn.charge);
+          break;
       }
+    }
+    // Reverse incoming transfers credited to this account.
+    for (final row in incomingBeforePeriod) {
+      final txn = BkashTransaction.fromMap(row);
+      openingBkashBalance -= txn.amount;
     }
 
     // Get transactions in the period
     final periodTransactions = await getBkashInRange(startDate, endDate);
     final accountTransactions = periodTransactions
         .where((txn) => txn.accountId == accountId)
+        .toList();
+    // Incoming transfers received in the period.
+    final incomingInPeriod = periodTransactions
+        .where(
+          (txn) =>
+              txn.toAccountId == accountId && txn.type == BkashType.transfer,
+        )
         .toList();
 
     // Sum up transactions by type
@@ -1375,6 +1444,8 @@ class TransactionRepository {
         case BkashType.commission:
           totalCommission += txn.amount;
           break;
+        case BkashType.transfer:
+          break; // transfer is a bKash outflow; shown separately
       }
     }
 
@@ -1386,7 +1457,7 @@ class TransactionRepository {
       switch (txn.type) {
         case BkashType.cashIn:
           closingBkashBalance += txn.amount;
-          closingCashBalance += 0;
+          closingCashBalance -= (txn.amount + txn.charge);
           break;
         case BkashType.cashOut:
         case BkashType.sendMoney:
@@ -1397,7 +1468,14 @@ class TransactionRepository {
         case BkashType.commission:
           closingCashBalance += txn.amount;
           break;
+        case BkashType.transfer:
+          closingBkashBalance -= (txn.amount + txn.charge);
+          break;
       }
+    }
+    // Apply incoming transfers received during this period.
+    for (final txn in incomingInPeriod) {
+      closingBkashBalance += txn.amount;
     }
 
     final netChange =

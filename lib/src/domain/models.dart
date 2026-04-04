@@ -2,7 +2,7 @@ import 'dart:convert';
 
 enum ProductCategory { medicine, stationery }
 
-enum BkashType { cashIn, cashOut, sendMoney, billPayment, commission }
+enum BkashType { cashIn, cashOut, sendMoney, billPayment, commission, transfer }
 
 enum ReportPeriod { day, month, year }
 
@@ -569,6 +569,7 @@ class BkashTransaction {
     required this.netAmount,
     required this.createdAt,
     required this.note,
+    this.toAccountId,
   });
 
   final String? id;
@@ -579,6 +580,8 @@ class BkashTransaction {
   final double netAmount;
   final DateTime createdAt;
   final String? note;
+  /// Destination account for [BkashType.transfer] transactions.
+  final String? toAccountId;
 
   Map<String, Object?> toMap() {
     return {
@@ -590,6 +593,7 @@ class BkashTransaction {
       'net_amount': netAmount,
       'created_at': createdAt.toIso8601String(),
       'note': note,
+      'to_account_id': toAccountId,
     };
   }
 
@@ -603,6 +607,7 @@ class BkashTransaction {
       netAmount: (map['net_amount'] as num).toDouble(),
       createdAt: DateTime.parse(map['created_at'] as String),
       note: map['note'] as String?,
+      toAccountId: map['to_account_id'] as String?,
     );
   }
 }
