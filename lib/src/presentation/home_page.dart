@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../app.dart';
+import '../core/backup/backup_service.dart';
 import '../core/backup/save_file_helper.dart';
 import '../domain/models.dart';
 import 'app_controller.dart';
@@ -802,10 +803,10 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
     if (bytes == null || !mounted) return;
 
     final controller = ref.read(appControllerProvider);
+
+    // Step 1: integrity + format validation
     final validation = await controller.validateBackup(bytes);
-
     if (!mounted) return;
-
     if (!validation.success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -816,96 +817,60 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
       return;
     }
 
-    final meta = validation.meta!;
-    DateTime? parsedDate;
-    try {
-      parsedDate = DateTime.parse(meta.exportedAt).toLocal();
-    } catch (_) {}
-    final dateLabel = parsedDate != null
-        ? DateFormat('dd MMM yyyy, hh:mm a').format(parsedDate)
-        : meta.exportedAt;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Confirm Restore'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.red.shade50,
-                border: Border.all(color: Colors.red.shade200),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.warning_amber_rounded,
-                    color: Colors.red.shade700,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'All current data will be replaced. '
-                      'This cannot be undone.',
-                      style: TextStyle(fontSize: 13),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            _BackupInfoRow(label: 'Exported', value: dateLabel),
-            _BackupInfoRow(
-              label: 'Device',
-              value: meta.deviceId.length >= 8
-                  ? meta.deviceId.substring(0, 8).toUpperCase()
-                  : meta.deviceId.toUpperCase(),
-            ),
-            _BackupInfoRow(label: 'Integrity', value: '✓ SHA-256 verified'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Replace All Data'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-
+    // Step 2: conflict analysis (no DB writes)
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Restoring backup…'),
+        content: Text('Analysing backup for conflicts…'),
         duration: Duration(seconds: 4),
       ),
     );
+    final report = await controller.analyzeConflicts(bytes);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
-    final importResult = await controller.importBackup(bytes);
+    // Step 3: show conflict-preview dialog so the user can choose
+    final choice = await showDialog<_ImportChoice>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _ConflictPreviewDialog(report: report),
+    );
+    if (choice == null || !mounted) return;
+
+    // Step 4: execute chosen strategy
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          choice == _ImportChoice.merge
+              ? 'Merging — adding new records…'
+              : 'Restoring — replacing all data…',
+        ),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+
+    final ImportResult importResult;
+    if (choice == _ImportChoice.merge) {
+      importResult = await controller.mergeBackup(bytes);
+    } else {
+      importResult = await controller.importBackup(bytes);
+    }
 
     if (!mounted) return;
     if (importResult.success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Data restored successfully.'),
+          content: Text(
+            choice == _ImportChoice.merge
+                ? 'Merge complete — new records added, local data preserved.'
+                : 'Full restore complete — all data replaced.',
+          ),
           backgroundColor: Colors.green.shade700,
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(importResult.error ?? 'Restore failed.'),
+          content: Text(importResult.error ?? 'Import failed.'),
           backgroundColor: Colors.red.shade700,
         ),
       );
@@ -6906,6 +6871,375 @@ class _BackupInfoRow extends StatelessWidget {
           ),
           const Text(': ', style: TextStyle(fontSize: 12)),
           Expanded(child: Text(value, style: const TextStyle(fontSize: 12))),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Multi-device conflict resolution ─────────────────────────────────────────
+
+enum _ImportChoice { merge, replace }
+
+/// Displays a conflict analysis report and lets the user choose between
+/// Smart Merge (safe, additive) and Full Replace (destructive).
+class _ConflictPreviewDialog extends StatefulWidget {
+  final ConflictReport report;
+  const _ConflictPreviewDialog({required this.report});
+
+  @override
+  State<_ConflictPreviewDialog> createState() => _ConflictPreviewDialogState();
+}
+
+class _ConflictPreviewDialogState extends State<_ConflictPreviewDialog> {
+  bool _confirmingReplace = false;
+
+  static const Map<String, String> _tableLabels = {
+    'products': 'Products',
+    'customers': 'Customers',
+    'bkash_accounts': 'bKash Accounts',
+    'invoices': 'Invoices',
+    'invoice_items': 'Invoice Items',
+    'invoice_payments': 'Invoice Payments',
+    'sales': 'Sales',
+    'purchases': 'Purchases',
+    'inventory_adjustments': 'Stock Adjustments',
+    'bkash_transactions': 'bKash Transactions',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final report = widget.report;
+    final scheme = Theme.of(context).colorScheme;
+
+    DateTime? exportedDate;
+    try {
+      exportedDate = DateTime.parse(report.meta.exportedAt).toLocal();
+    } catch (_) {}
+    final dateLabel = exportedDate != null
+        ? DateFormat('dd MMM yyyy, hh:mm a').format(exportedDate)
+        : report.meta.exportedAt;
+    final deviceLabel = report.meta.deviceId.length >= 8
+        ? report.meta.deviceId.substring(0, 8).toUpperCase()
+        : report.meta.deviceId.toUpperCase();
+
+    final activeTables = report.tables
+        .where((t) => t.localCount > 0 || t.backupCount > 0)
+        .toList();
+
+    return AlertDialog(
+      title: const Row(
+        children: [
+          Icon(Icons.compare_arrows_rounded, size: 22),
+          SizedBox(width: 10),
+          Text('Import Preview'),
+        ],
+      ),
+      content: SizedBox(
+        width: 520,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ── Backup metadata ──
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  children: [
+                    _BackupInfoRow(label: 'Exported', value: dateLabel),
+                    _BackupInfoRow(label: 'Device', value: deviceLabel),
+                    const _BackupInfoRow(
+                      label: 'Integrity',
+                      value: '✓ SHA-256 verified',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // ── Status chips ──
+              if (report.hasNewData)
+                _StatusChip(
+                  icon: Icons.add_circle_outline,
+                  color: const Color(0xFF059669),
+                  label:
+                      '${report.totalNewInBackup} new record(s) in this backup — will be added on Smart Merge',
+                ),
+              if (report.localHasNewerRecords) ...[
+                const SizedBox(height: 6),
+                _StatusChip(
+                  icon: Icons.history_rounded,
+                  color: Colors.amber.shade700,
+                  label:
+                      'This device has records created after the backup was exported',
+                ),
+              ],
+              if (report.hasConflicts) ...[
+                const SizedBox(height: 6),
+                _StatusChip(
+                  icon: Icons.warning_amber_rounded,
+                  color: Colors.orange.shade700,
+                  label:
+                      '${report.totalLocalOnly} local record(s) not present in backup — '
+                      'kept on Smart Merge, permanently lost on Full Replace',
+                ),
+              ],
+              if (!report.hasNewData &&
+                  !report.hasConflicts &&
+                  !report.localHasNewerRecords)
+                _StatusChip(
+                  icon: Icons.check_circle_outline,
+                  color: scheme.primary,
+                  label:
+                      'Backup matches local data exactly — Smart Merge will have no effect',
+                ),
+
+              // ── Replace confirmation warning ──
+              if (_confirmingReplace) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    border: Border.all(color: Colors.red.shade300),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.delete_forever_outlined,
+                        color: Colors.red.shade700,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'ALL current data will be permanently deleted and '
+                          'replaced by the backup. This cannot be undone. '
+                          'Tap "Confirm Replace" to proceed.',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              // ── Table-by-table breakdown ──
+              if (activeTables.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                const Divider(height: 1),
+                const SizedBox(height: 8),
+                const Text(
+                  'Table-by-table preview',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+                const SizedBox(height: 6),
+                const _ConflictTableRow(
+                  label: 'Table',
+                  local: 'Local',
+                  backup: 'Backup',
+                  toAdd: '+ New',
+                  localOnly: '± Local',
+                  isHeader: true,
+                ),
+                ...activeTables.map(
+                  (t) => _ConflictTableRow(
+                    label: _tableLabels[t.table] ?? t.table,
+                    local: '${t.localCount}',
+                    backup: '${t.backupCount}',
+                    toAdd: t.newInBackup > 0 ? '+${t.newInBackup}' : '—',
+                    localOnly: t.localOnly > 0 ? '${t.localOnly}' : '—',
+                    highlightAdd: t.newInBackup > 0,
+                    highlightLocal: t.localOnly > 0,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+
+              // ── Merge explanation ──
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: scheme.primaryContainer.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.merge_type_rounded,
+                      size: 16,
+                      color: scheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Smart Merge only adds records that are new in the backup. '
+                        'Your local data is never overwritten or deleted.',
+                        style: TextStyle(fontSize: 11, color: scheme.onSurface),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        if (!_confirmingReplace)
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.red.shade700,
+              side: BorderSide(color: Colors.red.shade300),
+            ),
+            onPressed: () => setState(() => _confirmingReplace = true),
+            icon: const Icon(Icons.warning_amber_rounded, size: 16),
+            label: const Text('Full Replace ▸'),
+          )
+        else
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.red.shade700,
+              side: BorderSide(color: Colors.red.shade300),
+            ),
+            onPressed: () => Navigator.pop(context, _ImportChoice.replace),
+            icon: const Icon(Icons.delete_forever_outlined, size: 18),
+            label: const Text('Confirm Replace'),
+          ),
+        FilledButton.icon(
+          onPressed: () => Navigator.pop(context, _ImportChoice.merge),
+          icon: const Icon(Icons.merge_type_rounded, size: 18),
+          label: const Text('Smart Merge ✓'),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String label;
+
+  const _StatusChip({
+    required this.icon,
+    required this.color,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(icon, size: 15, color: color),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: color,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConflictTableRow extends StatelessWidget {
+  final String label;
+  final String local;
+  final String backup;
+  final String toAdd;
+  final String localOnly;
+  final bool isHeader;
+  final bool highlightAdd;
+  final bool highlightLocal;
+
+  const _ConflictTableRow({
+    required this.label,
+    required this.local,
+    required this.backup,
+    required this.toAdd,
+    required this.localOnly,
+    this.isHeader = false,
+    this.highlightAdd = false,
+    this.highlightLocal = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final base = isHeader
+        ? const TextStyle(fontWeight: FontWeight.w600, fontSize: 11)
+        : const TextStyle(fontSize: 12);
+    final addStyle = base.copyWith(
+      color: highlightAdd ? const Color(0xFF059669) : null,
+      fontWeight: highlightAdd ? FontWeight.w600 : base.fontWeight,
+    );
+    final localStyle = base.copyWith(
+      color: highlightLocal ? Colors.orange.shade700 : null,
+      fontWeight: highlightLocal ? FontWeight.w600 : base.fontWeight,
+    );
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+      decoration: BoxDecoration(
+        color: isHeader ? scheme.surfaceContainerHighest : null,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        children: [
+          Expanded(flex: 3, child: Text(label, style: base)),
+          SizedBox(
+            width: 44,
+            child: Text(local, style: base, textAlign: TextAlign.center),
+          ),
+          SizedBox(
+            width: 44,
+            child: Text(backup, style: base, textAlign: TextAlign.center),
+          ),
+          SizedBox(
+            width: 44,
+            child: Text(toAdd, style: addStyle, textAlign: TextAlign.center),
+          ),
+          SizedBox(
+            width: 44,
+            child: Text(
+              localOnly,
+              style: localStyle,
+              textAlign: TextAlign.center,
+            ),
+          ),
         ],
       ),
     );

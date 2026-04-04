@@ -656,4 +656,19 @@ class PharmacyAppController extends ChangeNotifier {
     }
     return result;
   }
+
+  /// Analyses conflicts between a backup and the current database without
+  /// touching any data.
+  Future<ConflictReport> analyzeConflicts(Uint8List bytes) =>
+      BackupService().analyzeConflicts(bytes);
+
+  /// Merges new records from a backup into the local database using
+  /// INSERT-OR-IGNORE — no local data is ever deleted or overwritten.
+  Future<ImportResult> mergeBackup(Uint8List bytes) async {
+    final result = await BackupService().mergeBackup(bytes);
+    if (result.success) {
+      await refreshAll();
+    }
+    return result;
+  }
 }
