@@ -4,7 +4,7 @@ import '../security/auth_service.dart';
 
 class AuthController extends ChangeNotifier {
   AuthController({AuthService? authService})
-      : _authService = authService ?? AuthService();
+    : _authService = authService ?? AuthService();
 
   final AuthService _authService;
 
@@ -13,7 +13,6 @@ class AuthController extends ChangeNotifier {
   bool _hasAccount = false;
   bool _rememberMe = false;
   bool _isBusy = false;
-  bool _seededUserThisLaunch = false;
   int _remainingAttempts = 5;
   DateTime? _lockedUntil;
   String? _registeredEmail;
@@ -24,7 +23,6 @@ class AuthController extends ChangeNotifier {
   bool get hasAccount => _hasAccount;
   bool get rememberMe => _rememberMe;
   bool get isBusy => _isBusy;
-  bool get seededUserThisLaunch => _seededUserThisLaunch;
   int get remainingAttempts => _remainingAttempts;
   DateTime? get lockedUntil => _lockedUntil;
   String? get registeredEmail => _registeredEmail;
@@ -35,18 +33,7 @@ class AuthController extends ChangeNotifier {
       return;
     }
 
-    var hasAccount = await _authService.hasUser();
-    final seedNoticeDismissed = await _authService.hasDismissedSeedNotice();
-    const defaultEmail = 'admin@jarin.com';
-    const defaultPassword = 'Jarin@2026';
-
-    if (!hasAccount) {
-      await _authService.register(email: defaultEmail, password: defaultPassword);
-      await _authService.signOut(forgetRemembered: true);
-      hasAccount = true;
-      _seededUserThisLaunch = !seedNoticeDismissed;
-    }
-
+    final hasAccount = await _authService.hasUser();
     final remembered = await _authService.isRememberedSession();
     final email = await _authService.getRegisteredEmail();
     final lockInfo = await _authService.getLockInfo();
@@ -66,13 +53,9 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> signIn({
-    required String email,
-    required String password,
-  }) async {
+  Future<bool> signIn({required String email, required String password}) async {
     if (!_hasAccount) {
-      _errorMessage =
-          'No account exists in the app database yet. Restart once to auto-create the default user (admin@jarin.com).';
+      _errorMessage = 'No account found. Please create an account first.';
       notifyListeners();
       return false;
     }
@@ -99,13 +82,11 @@ class AuthController extends ChangeNotifier {
         rememberMe: _rememberMe,
       );
       if (result.success) {
-        await _authService.dismissSeedNoticePermanently();
         _isAuthenticated = true;
         _registeredEmail = normalizedEmail;
         _errorMessage = null;
         _lockedUntil = null;
         _remainingAttempts = 5;
-        _seededUserThisLaunch = false;
         notifyListeners();
         return true;
       }
@@ -118,8 +99,111 @@ class AuthController extends ChangeNotifier {
       } else if (result.remainingAttempts == 0) {
         _errorMessage = 'Authentication failed.';
       } else {
-        _errorMessage = 'Invalid email or password. Remaining attempts: $_remainingAttempts';
+        _errorMessage =
+            'Invalid email or password. Remaining attempts: $_remainingAttempts';
       }
+      notifyListeners();
+      return false;
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  /// Creates a new account on first launch.
+  Future<bool> createAccount({
+    required String email,
+    required String password,
+  }) async {
+    final normalized = email.trim().toLowerCase();
+    if (!_isValidEmail(normalized)) {
+      _errorMessage = 'Enter a valid email address.';
+      notifyListeners();
+      return false;
+    }
+    if (password.length < 6) {
+      _errorMessage = 'Password must be at least 6 characters.';
+      notifyListeners();
+      return false;
+    }
+    _setBusy(true);
+    try {
+      await _authService.register(email: normalized, password: password);
+      _hasAccount = true;
+      _registeredEmail = normalized;
+      _isAuthenticated = true;
+      _errorMessage = null;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  /// Changes the password, requires current password for verification.
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    if (newPassword.length < 6) {
+      _errorMessage = 'New password must be at least 6 characters.';
+      notifyListeners();
+      return false;
+    }
+    _setBusy(true);
+    try {
+      final ok = await _authService.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+      if (!ok) {
+        _errorMessage = 'Current password is incorrect.';
+        notifyListeners();
+        return false;
+      }
+      _errorMessage = null;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  /// Updates the account email, requires current password for verification.
+  Future<bool> updateEmail({
+    required String currentPassword,
+    required String newEmail,
+  }) async {
+    final normalized = newEmail.trim().toLowerCase();
+    if (!_isValidEmail(normalized)) {
+      _errorMessage = 'Enter a valid email address.';
+      notifyListeners();
+      return false;
+    }
+    _setBusy(true);
+    try {
+      final ok = await _authService.updateEmail(
+        currentPassword: currentPassword,
+        newEmail: normalized,
+      );
+      if (!ok) {
+        _errorMessage = 'Password is incorrect.';
+        notifyListeners();
+        return false;
+      }
+      _registeredEmail = normalized;
+      _errorMessage = null;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
       notifyListeners();
       return false;
     } finally {
@@ -136,14 +220,6 @@ class AuthController extends ChangeNotifier {
 
   void clearError() {
     _errorMessage = null;
-    notifyListeners();
-  }
-
-  void clearSeededUserNotice() {
-    if (!_seededUserThisLaunch) {
-      return;
-    }
-    _seededUserThisLaunch = false;
     notifyListeners();
   }
 

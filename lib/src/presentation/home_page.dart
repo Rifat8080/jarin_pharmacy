@@ -213,7 +213,6 @@ class PharmacyHomePage extends ConsumerStatefulWidget {
 
 class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
   int _selectedTab = 0;
-  bool _focusMode = false;
 
   String get _activeTabTitle {
     return switch (_selectedTab) {
@@ -247,21 +246,13 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
         .length;
 
     final selectedPage = switch (_selectedTab) {
-      0 => _DashboardTab(
-        controller: controller,
-        onNavigate: _navigateTo,
-        focusMode: _focusMode,
-      ),
-      1 => _SellTab(controller: controller, focusMode: _focusMode),
-      2 => _InventoryTab(controller: controller, focusMode: _focusMode),
+      0 => _DashboardTab(controller: controller, onNavigate: _navigateTo),
+      1 => _SellTab(controller: controller),
+      2 => _InventoryTab(controller: controller),
       3 => _BkashTab(controller: controller),
       4 => _ReportsTab(controller: controller, onPickDate: _pickReportDate),
       5 => const CustomerListPage(showScaffold: false),
-      _ => _DashboardTab(
-        controller: controller,
-        onNavigate: _navigateTo,
-        focusMode: _focusMode,
-      ),
+      _ => _DashboardTab(controller: controller, onNavigate: _navigateTo),
     };
 
     final scheme = Theme.of(context).colorScheme;
@@ -281,16 +272,7 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
               ),
             ],
           ),
-        Expanded(
-          child: MediaQuery(
-            data: MediaQuery.of(context).copyWith(
-              textScaler: _focusMode
-                  ? const TextScaler.linear(1.08)
-                  : const TextScaler.linear(1),
-            ),
-            child: selectedPage,
-          ),
-        ),
+        Expanded(child: selectedPage),
       ],
     );
 
@@ -401,10 +383,10 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
         ),
         const SizedBox(width: 4),
         IconButton(
-          tooltip: _focusMode ? 'Focus On' : 'Focus Off',
-          onPressed: () => setState(() => _focusMode = !_focusMode),
+          tooltip: 'Profile',
+          onPressed: () => _showProfileDialog(context),
           icon: Icon(
-            _focusMode ? Icons.visibility : Icons.visibility_outlined,
+            Icons.manage_accounts_outlined,
             size: 18,
             color: scheme.onSurface,
           ),
@@ -593,12 +575,9 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
                             ref.read(authControllerProvider).lock(),
                       ),
                       _buildRailIconBtn(
-                        icon: _focusMode
-                            ? Icons.visibility
-                            : Icons.visibility_outlined,
-                        tooltip: _focusMode ? 'Focus On' : 'Focus Off',
-                        onPressed: () =>
-                            setState(() => _focusMode = !_focusMode),
+                        icon: Icons.manage_accounts_outlined,
+                        tooltip: 'Profile',
+                        onPressed: () => _showProfileDialog(context),
                       ),
                       _buildRailIconBtn(
                         icon: Icons.backup_outlined,
@@ -704,9 +683,7 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
       ),
       child: NavigationBar(
         height: 68,
-        labelBehavior: _focusMode
-            ? NavigationDestinationLabelBehavior.onlyShowSelected
-            : null,
+        labelBehavior: null,
         selectedIndex: _selectedTab,
         onDestinationSelected: (index) {
           if (index == _selectedTab) {
@@ -935,6 +912,201 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
     }
   }
 
+  void _showProfileDialog(BuildContext context) {
+    final authCtrl = ref.read(authControllerProvider);
+    final emailCtrl = TextEditingController(
+      text: authCtrl.registeredEmail ?? '',
+    );
+    final currentPwCtrl = TextEditingController();
+    final newPwCtrl = TextEditingController();
+    final confirmPwCtrl = TextEditingController();
+    var obscureCurrent = true;
+    var obscureNew = true;
+    var obscureConfirm = true;
+    String? errorMsg;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.manage_accounts_outlined, size: 22),
+                SizedBox(width: 10),
+                Text('Edit Profile'),
+              ],
+            ),
+            content: SizedBox(
+              width: 380,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Email',
+                      prefixIcon: Icon(Icons.email_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: currentPwCtrl,
+                    obscureText: obscureCurrent,
+                    decoration: InputDecoration(
+                      labelText: 'Current password (required)',
+                      prefixIcon: const Icon(Icons.lock_outlined),
+                      suffixIcon: IconButton(
+                        onPressed: () => setDialogState(
+                          () => obscureCurrent = !obscureCurrent,
+                        ),
+                        icon: Icon(
+                          obscureCurrent
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 24),
+                  Text(
+                    'New password (leave blank to keep current)',
+                    style: Theme.of(ctx).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: newPwCtrl,
+                    obscureText: obscureNew,
+                    decoration: InputDecoration(
+                      labelText: 'New password',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        onPressed: () =>
+                            setDialogState(() => obscureNew = !obscureNew),
+                        icon: Icon(
+                          obscureNew
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: confirmPwCtrl,
+                    obscureText: obscureConfirm,
+                    decoration: InputDecoration(
+                      labelText: 'Confirm new password',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        onPressed: () => setDialogState(
+                          () => obscureConfirm = !obscureConfirm,
+                        ),
+                        icon: Icon(
+                          obscureConfirm
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (errorMsg != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      errorMsg!,
+                      style: TextStyle(
+                        color: Theme.of(ctx).colorScheme.error,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  final currentPw = currentPwCtrl.text;
+                  final newEmail = emailCtrl.text.trim();
+                  final newPw = newPwCtrl.text;
+                  final confirmPw = confirmPwCtrl.text;
+
+                  if (currentPw.isEmpty) {
+                    setDialogState(
+                      () => errorMsg = 'Current password is required.',
+                    );
+                    return;
+                  }
+                  if (newPw.isNotEmpty) {
+                    if (newPw.length < 6) {
+                      setDialogState(
+                        () => errorMsg =
+                            'New password must be at least 6 characters.',
+                      );
+                      return;
+                    }
+                    if (newPw != confirmPw) {
+                      setDialogState(
+                        () => errorMsg = 'New passwords do not match.',
+                      );
+                      return;
+                    }
+                  }
+
+                  bool anyError = false;
+                  final ctrl = ref.read(authControllerProvider);
+
+                  if (newEmail != (authCtrl.registeredEmail ?? '')) {
+                    final ok = await ctrl.updateEmail(
+                      currentPassword: currentPw,
+                      newEmail: newEmail,
+                    );
+                    if (!ok) {
+                      setDialogState(
+                        () => errorMsg =
+                            'Failed to update email. Check current password.',
+                      );
+                      anyError = true;
+                    }
+                  }
+
+                  if (!anyError && newPw.isNotEmpty) {
+                    final ok = await ctrl.changePassword(
+                      currentPassword: currentPw,
+                      newPassword: newPw,
+                    );
+                    if (!ok) {
+                      setDialogState(
+                        () => errorMsg =
+                            'Failed to change password. Check current password.',
+                      );
+                      anyError = true;
+                    }
+                  }
+
+                  if (!anyError && ctx.mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Profile updated successfully.'),
+                      ),
+                    );
+                  }
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   void _showBackupDialog(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     showDialog(
@@ -1019,15 +1191,10 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
 }
 
 class _DashboardTab extends StatefulWidget {
-  const _DashboardTab({
-    required this.controller,
-    required this.onNavigate,
-    required this.focusMode,
-  });
+  const _DashboardTab({required this.controller, required this.onNavigate});
 
   final PharmacyAppController controller;
   final void Function(int index) onNavigate;
-  final bool focusMode;
 
   @override
   State<_DashboardTab> createState() => _DashboardTabState();
@@ -1413,16 +1580,15 @@ class _DashboardTabState extends State<_DashboardTab> {
               ),
               if (_searchResults.isNotEmpty) ...[
                 const SizedBox(height: 8),
-                if (!widget.focusMode)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(
-                      'Search results — Enter=Sell, Ctrl+Enter=Stock In',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    'Search results — Enter=Sell, Ctrl+Enter=Stock In',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
                     ),
                   ),
+                ),
                 ..._searchResults
                     .take(8)
                     .map(
@@ -1669,10 +1835,9 @@ class _DashboardTabState extends State<_DashboardTab> {
 }
 
 class _SellTab extends StatefulWidget {
-  const _SellTab({required this.controller, required this.focusMode});
+  const _SellTab({required this.controller});
 
   final PharmacyAppController controller;
-  final bool focusMode;
 
   @override
   State<_SellTab> createState() => _SellTabState();
@@ -2462,7 +2627,7 @@ class _SellTabState extends State<_SellTab> {
     return Column(
       children: [
         Padding(
-          padding: EdgeInsets.fromLTRB(16, widget.focusMode ? 10 : 16, 16, 8),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Row(
             children: [
               Expanded(
@@ -2533,10 +2698,9 @@ class _SellTabState extends State<_SellTab> {
 }
 
 class _InventoryTab extends StatefulWidget {
-  const _InventoryTab({required this.controller, required this.focusMode});
+  const _InventoryTab({required this.controller});
 
   final PharmacyAppController controller;
-  final bool focusMode;
 
   @override
   State<_InventoryTab> createState() => _InventoryTabState();
@@ -3792,7 +3956,7 @@ class _InventoryTabState extends State<_InventoryTab> {
     return Column(
       children: [
         Padding(
-          padding: EdgeInsets.fromLTRB(16, widget.focusMode ? 10 : 16, 16, 8),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Row(
             children: [
               Expanded(

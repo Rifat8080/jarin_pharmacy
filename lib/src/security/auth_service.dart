@@ -10,12 +10,14 @@ import '../core/db/app_database.dart';
 
 class AuthService {
   AuthService({FlutterSecureStorage? storage})
-      : _legacyStorage =
-            storage ??
-            const FlutterSecureStorage(
-              aOptions: AndroidOptions(encryptedSharedPreferences: true),
-              iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
-            );
+    : _legacyStorage =
+          storage ??
+          const FlutterSecureStorage(
+            aOptions: AndroidOptions(encryptedSharedPreferences: true),
+            iOptions: IOSOptions(
+              accessibility: KeychainAccessibility.first_unlock,
+            ),
+          );
 
   final FlutterSecureStorage _legacyStorage;
   static const Uuid _uuid = Uuid();
@@ -163,10 +165,14 @@ class AuthService {
       await _deleteState(_lockedUntilKey);
       await _writeState(_sessionActiveKey, '1');
       await _writeState(_rememberMeKey, rememberMe ? '1' : '0');
-      return const VerificationResult(success: true, remainingAttempts: _maxFailedAttempts);
+      return const VerificationResult(
+        success: true,
+        remainingAttempts: _maxFailedAttempts,
+      );
     }
 
-    final failedAttempts = (int.tryParse(await _readState(_failedAttemptsKey) ?? '0') ?? 0) + 1;
+    final failedAttempts =
+        (int.tryParse(await _readState(_failedAttemptsKey) ?? '0') ?? 0) + 1;
 
     if (failedAttempts >= _maxFailedAttempts) {
       final lockedUntil = DateTime.now().add(_lockDuration);
@@ -219,6 +225,77 @@ class AuthService {
     await _writeState(_failedAttemptsKey, '0');
     await _deleteState(_lockedUntilKey);
     await _writeState(_sessionActiveKey, '0');
+    return true;
+  }
+
+  /// Changes the password for the currently signed-in user.
+  /// Requires [currentPassword] for verification.
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _migrateLegacyStorageIfNeeded();
+    final db = await _db;
+    final rows = await db.query(
+      'auth_users',
+      columns: ['id', 'password_hash', 'password_salt'],
+      orderBy: 'created_at ASC',
+      limit: 1,
+    );
+    if (rows.isEmpty) return false;
+
+    final row = rows.first;
+    final salt = base64Decode(row['password_salt'] as String);
+    final computed = _computeHash(currentPassword, salt);
+    if (!_constantTimeEquals(row['password_hash'] as String, computed)) {
+      return false;
+    }
+
+    final newSalt = _generateSalt();
+    final newDigest = _computeHash(newPassword, newSalt);
+    await db.update(
+      'auth_users',
+      {
+        'password_hash': newDigest,
+        'password_salt': base64Encode(newSalt),
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [row['id']],
+    );
+    return true;
+  }
+
+  /// Updates the email for the currently signed-in user.
+  /// Requires [currentPassword] for verification.
+  Future<bool> updateEmail({
+    required String currentPassword,
+    required String newEmail,
+  }) async {
+    await _migrateLegacyStorageIfNeeded();
+    final db = await _db;
+    final rows = await db.query(
+      'auth_users',
+      columns: ['id', 'password_hash', 'password_salt'],
+      orderBy: 'created_at ASC',
+      limit: 1,
+    );
+    if (rows.isEmpty) return false;
+
+    final row = rows.first;
+    final salt = base64Decode(row['password_salt'] as String);
+    final computed = _computeHash(currentPassword, salt);
+    if (!_constantTimeEquals(row['password_hash'] as String, computed)) {
+      return false;
+    }
+
+    final normalized = newEmail.trim().toLowerCase();
+    await db.update(
+      'auth_users',
+      {'email': normalized, 'updated_at': DateTime.now().toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [row['id']],
+    );
     return true;
   }
 
