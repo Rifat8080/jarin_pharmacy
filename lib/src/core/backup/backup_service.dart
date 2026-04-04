@@ -142,8 +142,9 @@ class BackupService {
 
       final storedChecksum = payload['checksum'] as String?;
       if (storedChecksum != null) {
-        final computed =
-            sha256.convert(utf8.encode(jsonEncode(data))).toString();
+        final computed = sha256
+            .convert(utf8.encode(jsonEncode(data)))
+            .toString();
         if (computed != storedChecksum) {
           return ImportResult(
             success: false,

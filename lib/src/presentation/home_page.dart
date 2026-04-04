@@ -397,11 +397,7 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
         IconButton(
           tooltip: 'Backup & Restore',
           onPressed: () => _showBackupDialog(context),
-          icon: Icon(
-            Icons.backup_outlined,
-            size: 18,
-            color: scheme.onSurface,
-          ),
+          icon: Icon(Icons.backup_outlined, size: 18, color: scheme.onSurface),
         ),
         const SizedBox(width: 4),
         IconButton(
@@ -6741,16 +6737,11 @@ class _BackupInfoRow extends StatelessWidget {
             width: 66,
             child: Text(
               label,
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                fontSize: 12,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
             ),
           ),
           const Text(': ', style: TextStyle(fontSize: 12)),
-          Expanded(
-            child: Text(value, style: const TextStyle(fontSize: 12)),
-          ),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 12))),
         ],
       ),
     );
