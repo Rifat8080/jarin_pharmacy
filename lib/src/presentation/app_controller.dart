@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../core/backup/backup_service.dart';
 import '../core/db/app_database.dart';
 import '../domain/dgda_repository.dart';
 import '../domain/models.dart';
@@ -636,5 +637,23 @@ class PharmacyAppController extends ChangeNotifier {
       startDate: startDate,
       endDate: endDate,
     );
+  }
+
+  // ── Backup & Restore ─────────────────────────────────────────────────────
+
+  /// Exports all business data as a signed, timestamped JSON backup.
+  Future<Uint8List> exportBackup() => BackupService().createBackup();
+
+  /// Validates a backup file without making any DB changes.
+  Future<ImportResult> validateBackup(Uint8List bytes) =>
+      BackupService().validateBackup(bytes);
+
+  /// Restores from a backup, replacing all business data, then refreshes state.
+  Future<ImportResult> importBackup(Uint8List bytes) async {
+    final result = await BackupService().restoreBackup(bytes);
+    if (result.success) {
+      await refreshAll();
+    }
+    return result;
   }
 }

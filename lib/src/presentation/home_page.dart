@@ -1,9 +1,11 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../app.dart';
+import '../core/backup/save_file_helper.dart';
 import '../domain/models.dart';
 import 'app_controller.dart';
 import 'app_routes.dart';
@@ -393,6 +395,16 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
         ),
         const SizedBox(width: 4),
         IconButton(
+          tooltip: 'Backup & Restore',
+          onPressed: () => _showBackupDialog(context),
+          icon: Icon(
+            Icons.backup_outlined,
+            size: 18,
+            color: scheme.onSurface,
+          ),
+        ),
+        const SizedBox(width: 4),
+        IconButton(
           tooltip: _focusMode ? 'Focus On' : 'Focus Off',
           onPressed: () => setState(() => _focusMode = !_focusMode),
           icon: Icon(
@@ -593,6 +605,11 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
                             setState(() => _focusMode = !_focusMode),
                       ),
                       _buildRailIconBtn(
+                        icon: Icons.backup_outlined,
+                        tooltip: 'Backup & Restore',
+                        onPressed: () => _showBackupDialog(context),
+                      ),
+                      _buildRailIconBtn(
                         icon: Icons.refresh,
                         tooltip: 'Refresh',
                         onPressed: controller.isLoading
@@ -609,6 +626,11 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
                         tooltip: 'Lock',
                         onPressed: () =>
                             ref.read(authControllerProvider).lock(),
+                      ),
+                      _buildRailIconBtn(
+                        icon: Icons.backup_outlined,
+                        tooltip: 'Backup',
+                        onPressed: () => _showBackupDialog(context),
                       ),
                       _buildRailIconBtn(
                         icon: Icons.refresh,
@@ -757,6 +779,246 @@ class _PharmacyHomePageState extends ConsumerState<PharmacyHomePage> {
     }
 
     await controller.setReportAnchorDate(pickedDate);
+  }
+
+  // ── Backup & Restore ──────────────────────────────────────────────────────
+
+  Future<void> _exportBackup() async {
+    final controller = ref.read(appControllerProvider);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Preparing backup…'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    try {
+      final bytes = await controller.exportBackup();
+      final ts = DateFormat('yyyy-MM-dd_HH-mm-ss').format(DateTime.now());
+      final filename = 'jarin_pharmacy_backup_$ts.json';
+      await saveBackupFile(filename, bytes);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Backup saved as $filename'),
+            backgroundColor: Colors.green.shade700,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Export failed: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _importBackup() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+      withData: true,
+      dialogTitle: 'Select Backup File',
+    );
+
+    if (result == null || result.files.isEmpty) return;
+    final bytes = result.files.first.bytes;
+    if (bytes == null || !mounted) return;
+
+    final controller = ref.read(appControllerProvider);
+    final validation = await controller.validateBackup(bytes);
+
+    if (!mounted) return;
+
+    if (!validation.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(validation.error ?? 'Invalid backup file.'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+      return;
+    }
+
+    final meta = validation.meta!;
+    DateTime? parsedDate;
+    try {
+      parsedDate = DateTime.parse(meta.exportedAt).toLocal();
+    } catch (_) {}
+    final dateLabel = parsedDate != null
+        ? DateFormat('dd MMM yyyy, hh:mm a').format(parsedDate)
+        : meta.exportedAt;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm Restore'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                border: Border.all(color: Colors.red.shade200),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.red.shade700,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'All current data will be replaced. '
+                      'This cannot be undone.',
+                      style: TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            _BackupInfoRow(label: 'Exported', value: dateLabel),
+            _BackupInfoRow(
+              label: 'Device',
+              value: meta.deviceId.length >= 8
+                  ? meta.deviceId.substring(0, 8).toUpperCase()
+                  : meta.deviceId.toUpperCase(),
+            ),
+            _BackupInfoRow(label: 'Integrity', value: '✓ SHA-256 verified'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Replace All Data'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Restoring backup…'),
+        duration: Duration(seconds: 4),
+      ),
+    );
+
+    final importResult = await controller.importBackup(bytes);
+
+    if (!mounted) return;
+    if (importResult.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Data restored successfully.'),
+          backgroundColor: Colors.green.shade700,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(importResult.error ?? 'Restore failed.'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
+  }
+
+  void _showBackupDialog(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.backup_rounded, size: 22),
+            SizedBox(width: 10),
+            Text('Backup & Restore'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _BackupOptionTile(
+              icon: Icons.cloud_upload_outlined,
+              iconColor: scheme.primary,
+              title: 'Export Backup',
+              subtitle:
+                  'Save all business data to a timestamped JSON file '
+                  'with a SHA-256 integrity checksum.',
+              onTap: () {
+                Navigator.pop(ctx);
+                _exportBackup();
+              },
+            ),
+            const SizedBox(height: 8),
+            _BackupOptionTile(
+              icon: Icons.cloud_download_outlined,
+              iconColor: const Color(0xFF059669),
+              title: 'Import Backup',
+              subtitle:
+                  'Restore from a backup file. Replaces all current '
+                  'data after checksum verification.',
+              onTap: () {
+                Navigator.pop(ctx);
+                _importBackup();
+              },
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 15,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Login credentials are never included in backups — '
+                      'each device keeps its own authentication.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: scheme.onSurfaceVariant,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -6384,6 +6646,112 @@ class _HoverLiftState extends State<_HoverLift> {
               : null,
         ),
         child: widget.child,
+      ),
+    );
+  }
+}
+
+// ── Backup dialog widgets ─────────────────────────────────────────────────────
+
+class _BackupOptionTile extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _BackupOptionTile({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Ink(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          border: Border.all(color: scheme.outlineVariant),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: iconColor, size: 21),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: scheme.outlineVariant,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BackupInfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _BackupInfoRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 66,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.w500,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          const Text(': ', style: TextStyle(fontSize: 12)),
+          Expanded(
+            child: Text(value, style: const TextStyle(fontSize: 12)),
+          ),
+        ],
       ),
     );
   }
