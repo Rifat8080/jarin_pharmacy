@@ -462,6 +462,7 @@ class PharmacyAppController extends ChangeNotifier {
     required double amount,
     required double charge,
     String? note,
+    String? toAccountId,
   }) async {
     await _transactions.updateBkash(
       bkashId: bkashId,
@@ -470,6 +471,7 @@ class PharmacyAppController extends ChangeNotifier {
       amount: amount,
       charge: charge,
       note: note,
+      toAccountId: toAccountId,
     );
     await refreshAll();
   }

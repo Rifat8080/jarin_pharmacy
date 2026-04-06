@@ -4774,21 +4774,36 @@ class _BkashTabState extends State<_BkashTab> {
     }
   }
 
-  Future<void> _showBkashDialog() async {
+  Future<void> _showBkashDialog({BkashTransaction? existingTransaction}) async {
     final accounts = widget.controller.bkashAccounts;
     if (accounts.isEmpty) {
       await _showAddAccountDialog();
       return;
     }
 
-    var selectedAccountId = _selectedAccountId ?? accounts.first.id;
-    String? selectedToAccountId = accounts.length > 1
-        ? accounts.firstWhere((a) => a.id != selectedAccountId).id
-        : null;
-    final amountController = TextEditingController();
-    final chargeController = TextEditingController(text: '0');
-    final noteController = TextEditingController();
-    var selectedType = BkashType.cashIn;
+    final isEditing = existingTransaction != null;
+    var selectedAccountId =
+        existingTransaction?.accountId ?? _selectedAccountId ?? accounts.first.id;
+    var selectedType = existingTransaction?.type ?? BkashType.cashIn;
+    String? selectedToAccountId;
+    if (selectedType == BkashType.transfer) {
+      selectedToAccountId = existingTransaction?.toAccountId;
+      if (selectedToAccountId == null || selectedToAccountId == selectedAccountId) {
+        final fallbackDestination = accounts
+            .where((account) => account.id != selectedAccountId)
+            .firstOrNull;
+        selectedToAccountId = fallbackDestination?.id;
+      }
+    }
+    final amountController = TextEditingController(
+      text: existingTransaction != null ? existingTransaction.amount.toString() : '',
+    );
+    final chargeController = TextEditingController(
+      text: existingTransaction != null ? existingTransaction.charge.toString() : '0',
+    );
+    final noteController = TextEditingController(
+      text: existingTransaction?.note ?? '',
+    );
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -4802,7 +4817,9 @@ class _BkashTabState extends State<_BkashTab> {
                 .toList();
 
             return AlertDialog(
-              title: const Text('Record bKash Transaction'),
+              title: Text(
+                isEditing ? 'Edit bKash Transaction' : 'Record bKash Transaction',
+              ),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -4972,7 +4989,7 @@ class _BkashTabState extends State<_BkashTab> {
                 ),
                 FilledButton(
                   onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Save'),
+                  child: Text(isEditing ? 'Update' : 'Save'),
                 ),
               ],
             );
@@ -4997,24 +5014,48 @@ class _BkashTabState extends State<_BkashTab> {
     }
 
     try {
-      await widget.controller.recordBkash(
-        accountId: selectedAccountId,
-        type: selectedType,
-        amount: amount,
-        charge: charge,
-        note: noteController.text.trim().isEmpty
-            ? null
-            : noteController.text.trim(),
-        toAccountId: selectedType == BkashType.transfer
-            ? selectedToAccountId
-            : null,
-      );
+      if (existingTransaction == null) {
+        await widget.controller.recordBkash(
+          accountId: selectedAccountId,
+          type: selectedType,
+          amount: amount,
+          charge: charge,
+          note: noteController.text.trim().isEmpty
+              ? null
+              : noteController.text.trim(),
+          toAccountId: selectedType == BkashType.transfer
+              ? selectedToAccountId
+              : null,
+        );
+      } else {
+        await widget.controller.updateBkash(
+          bkashId: existingTransaction.id!,
+          accountId: selectedAccountId,
+          type: selectedType,
+          amount: amount,
+          charge: charge,
+          note: noteController.text.trim().isEmpty
+              ? null
+              : noteController.text.trim(),
+          toAccountId: selectedType == BkashType.transfer
+              ? selectedToAccountId
+              : null,
+        );
+      }
       if (!mounted) return;
-      setState(() => _selectedAccountId = selectedAccountId);
+      if (!isEditing) {
+        setState(() => _selectedAccountId = selectedAccountId);
+      }
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save bKash entry: $error')),
+        SnackBar(
+          content: Text(
+            isEditing
+                ? 'Failed to update bKash entry: $error'
+                : 'Failed to save bKash entry: $error',
+          ),
+        ),
       );
     }
   }
@@ -5055,6 +5096,44 @@ class _BkashTabState extends State<_BkashTab> {
         SnackBar(content: Text('Failed to delete bKash entry: $error')),
       );
     }
+  }
+
+  Future<void> _editLatestBkashTransaction() async {
+    _ensureSelectedAccount();
+    final selectedAccount = widget.controller.bkashAccounts
+        .where((account) => account.id == _selectedAccountId)
+        .firstOrNull;
+
+    if (selectedAccount == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select an account to edit transactions.')),
+      );
+      return;
+    }
+
+    final outgoing = widget.controller.bkashTransactions
+        .where((item) => item.accountId == selectedAccount.id)
+        .toList();
+    final incomingTransfers = widget.controller.bkashTransactions
+        .where(
+          (item) =>
+              item.toAccountId == selectedAccount.id &&
+              item.type == BkashType.transfer,
+        )
+        .toList();
+
+    final transactions = [...outgoing, ...incomingTransfers]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    if (transactions.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No bKash transactions found to edit.')),
+      );
+      return;
+    }
+
+    await _showBkashDialog(existingTransaction: transactions.first);
   }
 
   Future<void> _showDatePickerDialog(String period) async {
@@ -5649,6 +5728,12 @@ class _BkashTabState extends State<_BkashTab> {
                         ),
                         const SizedBox(width: 4),
                         _BkashHeaderIconBtn(
+                          icon: Icons.edit_note_rounded,
+                          tooltip: 'Edit latest',
+                          onTap: _editLatestBkashTransaction,
+                        ),
+                        const SizedBox(width: 4),
+                        _BkashHeaderIconBtn(
                           icon: Icons.account_balance_wallet_outlined,
                           tooltip: 'Add Account',
                           onTap: _showAddAccountDialog,
@@ -5665,6 +5750,12 @@ class _BkashTabState extends State<_BkashTab> {
                           label: 'Record',
                           onTap: _showBkashDialog,
                           filled: true,
+                        ),
+                        const SizedBox(width: 8),
+                        _BkashHeaderBtn(
+                          icon: Icons.edit_note_rounded,
+                          label: 'Edit Latest',
+                          onTap: _editLatestBkashTransaction,
                         ),
                         const SizedBox(width: 8),
                         _BkashHeaderBtn(
@@ -5877,8 +5968,10 @@ class _BkashTabState extends State<_BkashTab> {
                           transaction: transaction,
                           isIncomingTransfer: isIncoming,
                           sourceAccountName: sourceName,
+                          onEdit: () =>
+                              _showBkashDialog(existingTransaction: transaction),
                           onDelete: isIncoming
-                              ? () {} // incoming transfers cannot be deleted from dest
+                              ? null // incoming transfers cannot be deleted from dest
                               : () => _deleteBkash(transaction),
                         );
                       },
@@ -6100,7 +6193,8 @@ class _BalanceBadge extends StatelessWidget {
 class _BkashTransactionTile extends StatelessWidget {
   const _BkashTransactionTile({
     required this.transaction,
-    required this.onDelete,
+    required this.onEdit,
+    this.onDelete,
 
     /// When true this transaction is an incoming transfer to the viewed account.
     this.isIncomingTransfer = false,
@@ -6108,7 +6202,8 @@ class _BkashTransactionTile extends StatelessWidget {
   });
 
   final BkashTransaction transaction;
-  final VoidCallback onDelete;
+  final VoidCallback onEdit;
+  final VoidCallback? onDelete;
   final bool isIncomingTransfer;
   final String? sourceAccountName;
 
@@ -6304,15 +6399,30 @@ class _BkashTransactionTile extends StatelessWidget {
                 ),
               ),
             ),
-            // Delete button
-            IconButton(
-              onPressed: onDelete,
-              icon: Icon(
-                Icons.delete_outline,
-                size: 18,
-                color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
-              ),
-              tooltip: 'Delete',
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  onPressed: onEdit,
+                  icon: Icon(
+                    Icons.edit_outlined,
+                    size: 18,
+                    color: scheme.onSurfaceVariant.withValues(alpha: 0.75),
+                  ),
+                  tooltip: 'Edit',
+                ),
+                IconButton(
+                  onPressed: onDelete,
+                  icon: Icon(
+                    Icons.delete_outline,
+                    size: 18,
+                    color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+                  ),
+                  tooltip: onDelete == null
+                      ? 'Delete from source account'
+                      : 'Delete',
+                ),
+              ],
             ),
           ],
         ),
