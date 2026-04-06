@@ -1,0 +1,54 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch: # allow manual trigger from GitHub UI
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Flutter SDK ─────────────────────────────────────────────────────
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.35.4"
+          channel: "stable"
+          cache: true
+
+      # ── 3. Enable Windows desktop ──────────────────────────────────────────
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      # ── 4. Install dependencies ────────────────────────────────────────────
+      - name: Install dependencies
+        run: flutter pub get
+
+      # ── 5. Build release EXE ───────────────────────────────────────────────
+      - name: Build Windows release
+        run: flutter build windows --release
+
+      # ── 6. Package into a zip (EXE + all required DLLs) ───────────────────
+      - name: Package build output
+        shell: pwsh
+        run: |
+          $src  = "build\windows\x64\runner\Release"
+          $dest = "jarin_pharmacy_windows.zip"
+          Compress-Archive -Path "$src\*" -DestinationPath $dest
+          Write-Host "Package created: $dest"
+
+      # ── 7. Upload artifact – downloadable from the Actions run page ────────
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarin_pharmacy_windows
+          path: jarin_pharmacy_windows.zip
+          retention-days: 30
