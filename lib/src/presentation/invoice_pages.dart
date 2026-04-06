@@ -110,39 +110,153 @@ class InvoiceListPage extends ConsumerWidget {
               separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final invoice = controller.invoices[index];
-                return Card(
-                  child: ListTile(
-                    title: Text(invoice.invoiceNumber),
-                    subtitle: Text(
-                      '${invoice.customerName ?? 'Walk-in customer'}${invoice.customerPhone == null ? '' : ' • ${invoice.customerPhone}'}\n${_invoiceDate(invoice.createdAt)} • Due ${_invoiceMoney(invoice.dueAmount)}',
-                    ),
-                    isThreeLine: true,
-                    trailing: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          _invoiceMoney(invoice.total),
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          _invoiceStatusLabel(invoice.paymentStatus),
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: _invoiceStatusColor(
-                                  context,
-                                  invoice.paymentStatus,
-                                ),
-                                fontWeight: FontWeight.w700,
-                              ),
+                final statusColor = _invoiceStatusColor(
+                  context,
+                  invoice.paymentStatus,
+                );
+                return InkWell(
+                  onTap: () {
+                    Navigator.of(context).pushNamed(
+                      AppRoutes.invoiceShow,
+                      arguments: invoice.id,
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.outlineVariant.withValues(alpha: 0.5),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.shadow.withValues(alpha: 0.04),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
-                    onTap: () {
-                      Navigator.of(
-                        context,
-                      ).pushNamed(AppRoutes.invoiceShow, arguments: invoice.id);
-                    },
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(11),
+                      child: IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Container(width: 4, color: statusColor),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 12,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            invoice.invoiceNumber,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleSmall
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            invoice.customerName ??
+                                                'Walk-in customer',
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.bodyMedium,
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            _invoiceDate(invoice.createdAt),
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodySmall
+                                                ?.copyWith(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .onSurfaceVariant,
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          _invoiceMoney(invoice.total),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleSmall
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: statusColor.withValues(
+                                              alpha: 0.12,
+                                            ),
+                                            borderRadius:
+                                                BorderRadius.circular(20),
+                                          ),
+                                          child: Text(
+                                            _invoiceStatusLabel(
+                                              invoice.paymentStatus,
+                                            ),
+                                            style: TextStyle(
+                                              color: statusColor,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                        ),
+                                        if (invoice.dueAmount > 0) ...[
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            'Due ${_invoiceMoney(invoice.dueAmount)}',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .labelSmall
+                                                ?.copyWith(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .error,
+                                                ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 );
               },
@@ -780,43 +894,116 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                           final avatarLabel = customer.name.isEmpty
                               ? '?'
                               : customer.name.substring(0, 1).toUpperCase();
+                          final hasDue = totalDue > 0;
+                          final scheme = Theme.of(context).colorScheme;
 
-                          return Card(
-                            child: ListTile(
-                              leading: CircleAvatar(child: Text(avatarLabel)),
-                              title: Text(customer.name),
-                              subtitle: Text(
-                                '${customer.phone ?? 'No phone'} • $invoiceCount invoice${invoiceCount == 1 ? '' : 's'}',
-                              ),
-                              trailing: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    'Due ${_invoiceMoney(totalDue)}',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      color: totalDue > 0
-                                          ? Theme.of(context).colorScheme.error
-                                          : Theme.of(
-                                              context,
-                                            ).colorScheme.primary,
-                                    ),
+                          return InkWell(
+                            onTap: () {
+                              Navigator.of(context).pushNamed(
+                                AppRoutes.customerShow,
+                                arguments: customer.id,
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: scheme.surface,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: scheme.outlineVariant.withValues(
+                                    alpha: 0.5,
                                   ),
-                                  Text(
-                                    'Paid ${_invoiceMoney(totalPaid)}',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: scheme.shadow.withValues(alpha: 0.04),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
                                   ),
                                 ],
                               ),
-                              onTap: () {
-                                Navigator.of(context).pushNamed(
-                                  AppRoutes.customerShow,
-                                  arguments: customer.id,
-                                );
-                              },
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 42,
+                                    height: 42,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          scheme.primary,
+                                          scheme.secondary,
+                                        ],
+                                      ),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        avatarLabel,
+                                        style: TextStyle(
+                                          color: scheme.onPrimary,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          customer.name,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleSmall
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '${customer.phone ?? 'No phone'} · $invoiceCount invoice${invoiceCount == 1 ? '' : 's'}',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color: scheme.onSurfaceVariant,
+                                              ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        'Due ${_invoiceMoney(totalDue)}',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13,
+                                          color: hasDue
+                                              ? scheme.error
+                                              : scheme.primary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Paid ${_invoiceMoney(totalPaid)}',
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodySmall,
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
                           );
                         },
@@ -867,113 +1054,381 @@ class CustomerProfilePage extends ConsumerWidget {
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        profile.customer.name,
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Phone: ${profile.customer.phone ?? 'Not provided'}',
-                      ),
-                      Text('Total Paid: ${_invoiceMoney(profile.totalPaid)}'),
-                      Text('Total Due: ${_invoiceMoney(profile.totalDue)}'),
-                      Text('Invoices: ${profile.invoices.length}'),
+              // ── Customer header card ──
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Theme.of(context).colorScheme.primaryContainer,
+                      Theme.of(context)
+                          .colorScheme
+                          .primaryContainer
+                          .withValues(alpha: 0.5),
                     ],
                   ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Avatar
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Theme.of(context).colorScheme.primary,
+                            Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withValues(alpha: 0.7),
+                          ],
+                        ),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          profile.customer.name.isNotEmpty
+                              ? profile.customer.name[0].toUpperCase()
+                              : '?',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onPrimary,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 26,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            profile.customer.name,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(fontWeight: FontWeight.w800),
+                          ),
+                          if ((profile.customer.phone ?? '').isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                profile.customer.phone!,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onPrimaryContainer,
+                                    ),
+                              ),
+                            ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: [
+                              _StatChip(
+                                label: 'Paid',
+                                value: _invoiceMoney(profile.totalPaid),
+                                color: const Color(0xFF16A34A),
+                              ),
+                              _StatChip(
+                                label: 'Due',
+                                value: _invoiceMoney(profile.totalDue),
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                              _StatChip(
+                                label: 'Invoices',
+                                value: '${profile.invoices.length}',
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 20),
+              // ── Invoices section ──
               Text(
                 'Invoices',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               if (profile.invoices.isEmpty)
-                const Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text('No invoices for this customer yet.'),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'No invoices for this customer yet.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
                   ),
                 )
               else
-                ...profile.invoices.map(
-                  (invoice) => Padding(
+                ...profile.invoices.map((invoice) {
+                  final scheme = Theme.of(context).colorScheme;
+                  final statusColor =
+                      _invoiceStatusColor(context, invoice.paymentStatus);
+                  return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: Card(
-                      child: ListTile(
-                        title: Text(invoice.invoiceNumber),
-                        subtitle: Text(_invoiceDate(invoice.createdAt)),
-                        trailing: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              _invoiceStatusLabel(invoice.paymentStatus),
-                              style: TextStyle(
-                                color: _invoiceStatusColor(
-                                  context,
-                                  invoice.paymentStatus,
-                                ),
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            Text(
-                              'Due ${_invoiceMoney(invoice.dueAmount)}',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () {
+                        Navigator.of(context).pushNamed(
+                          AppRoutes.invoiceShow,
+                          arguments: invoice.id,
+                        );
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: scheme.surface,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: scheme.outlineVariant.withValues(alpha: 0.45),
+                          ),
                         ),
-                        onTap: () {
-                          Navigator.of(context).pushNamed(
-                            AppRoutes.invoiceShow,
-                            arguments: invoice.id,
-                          );
-                        },
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: IntrinsicHeight(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Container(width: 4, color: statusColor),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 11,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                invoice.invoiceNumber,
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .titleSmall
+                                                    ?.copyWith(
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                              ),
+                                              const SizedBox(height: 3),
+                                              Text(
+                                                _invoiceDate(
+                                                  invoice.createdAt,
+                                                ),
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodySmall
+                                                    ?.copyWith(
+                                                      color: scheme
+                                                          .onSurfaceVariant,
+                                                    ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.end,
+                                          children: [
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 9,
+                                                vertical: 3,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: statusColor.withValues(
+                                                  alpha: 0.12,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(999),
+                                              ),
+                                              child: Text(
+                                                _invoiceStatusLabel(
+                                                  invoice.paymentStatus,
+                                                ),
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .labelSmall
+                                                    ?.copyWith(
+                                                      color: statusColor,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                              ),
+                                            ),
+                                            if (invoice.dueAmount > 0)
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                  top: 4,
+                                                ),
+                                                child: Text(
+                                                  'Due ${_invoiceMoney(invoice.dueAmount)}',
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .bodySmall
+                                                      ?.copyWith(
+                                                        color: scheme.error,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
+                  );
+                }),
               const SizedBox(height: 12),
+              // ── Payments section ──
               Text(
                 'Payments',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               if (profile.payments.isEmpty)
-                const Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(16),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                     child: Text(
                       'No follow-up payments recorded for this customer.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                     ),
                   ),
                 )
               else
-                ...profile.payments.map(
-                  (payment) => Padding(
+                ...profile.payments.map((payment) {
+                  final scheme = Theme.of(context).colorScheme;
+                  const stripColor = Color(0xFF16A34A);
+                  return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.receipt_long_outlined),
-                        title: Text(_invoiceMoney(payment.amount)),
-                        subtitle: Text(
-                          '${_invoiceDate(payment.createdAt)}${payment.note == null ? '' : ' • ${payment.note}'}',
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: scheme.surface,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: scheme.outlineVariant.withValues(alpha: 0.45),
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Container(width: 4, color: stripColor),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 11,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                        color: stripColor.withValues(alpha: 0.12),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        Icons.payment_outlined,
+                                        size: 18,
+                                        color: stripColor,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          _invoiceMoney(payment.amount),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleSmall
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w800,
+                                                color: stripColor,
+                                              ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '${_invoiceDate(payment.createdAt)}${payment.note == null ? '' : ' · ${payment.note}'}',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color: scheme.onSurfaceVariant,
+                                              ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ),
+                  );
+                }),
             ],
           ),
         );
@@ -1011,6 +1466,49 @@ class _InvoiceSummaryRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  const _StatChip({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+        ],
+      ),
     );
   }
 }

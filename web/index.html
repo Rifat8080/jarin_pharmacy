@@ -31,6 +31,16 @@
 
   <title>jarin_pharmacy</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Register the sqflite service worker so that IndexedDB-backed SQLite
+       works correctly and data persists across page reloads on web. -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sqflite_sw.js');
+      });
+    }
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>

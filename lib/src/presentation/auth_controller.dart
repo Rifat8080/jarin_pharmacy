@@ -53,6 +53,17 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Re-runs initialization from scratch — call after restoring a backup so
+  /// the gate picks up the newly-restored user account.
+  Future<void> forceReinitialize() async {
+    _initialized = false;
+    _isAuthenticated = false;
+    _hasAccount = false;
+    _registeredEmail = null;
+    _errorMessage = null;
+    await initialize();
+  }
+
   Future<bool> signIn({required String email, required String password}) async {
     if (!_hasAccount) {
       _errorMessage = 'No account found. Please create an account first.';

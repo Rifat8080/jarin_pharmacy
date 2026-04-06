@@ -1460,57 +1460,79 @@ class _DashboardTabState extends State<_DashboardTab> {
         // ── Hero header ──
         Container(
           width: double.infinity,
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                const Color(0xFF1D4ED8),
-                const Color(0xFF2563EB),
-                const Color(0xFF38BDF8),
+                Color(0xFF1D4ED8),
+                Color(0xFF2563EB),
+                Color(0xFF38BDF8),
               ],
             ),
           ),
-          padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
+          child: Stack(
+            clipBehavior: Clip.none,
             children: [
-              Text(
-                greeting,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.82),
-                  fontWeight: FontWeight.w500,
-                  fontSize: 14,
-                  letterSpacing: 0.2,
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Jarin Pharmacy',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 28,
-                  letterSpacing: -0.6,
-                  height: 1.1,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.calendar_today_outlined,
-                    color: Colors.white54,
-                    size: 14,
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    dateStr,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.74),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w400,
+              // decorative cross emblem
+              Positioned(
+                right: -8,
+                top: -12,
+                child: Opacity(
+                  opacity: 0.08,
+                  child: Text(
+                    '+',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 110,
+                      height: 1,
                     ),
+                  ),
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    greeting,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.82),
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Jarin Pharmacy',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 28,
+                      letterSpacing: -0.6,
+                      height: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_today_outlined,
+                        color: Colors.white54,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        dateStr,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.74),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1713,51 +1735,73 @@ class _DashboardTabState extends State<_DashboardTab> {
                 ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 10),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _QuickActionTile(
-                      title: 'New Bill',
-                      subtitle: 'Sell products',
-                      icon: Icons.point_of_sale_rounded,
-                      color: const Color(0xFF2563EB),
-                      onTap: () => widget.onNavigate(1),
-                    ),
-                    const SizedBox(width: 10),
-                    _QuickActionTile(
-                      title: 'Stock In',
-                      subtitle: 'Add inventory',
-                      icon: Icons.add_business_rounded,
-                      color: scheme.primary,
-                      onTap: () => widget.onNavigate(2),
-                    ),
-                    const SizedBox(width: 10),
-                    _QuickActionTile(
-                      title: 'Reports',
-                      subtitle: 'Business overview',
-                      icon: Icons.query_stats_rounded,
-                      color: scheme.tertiary,
-                      onTap: () => widget.onNavigate(4),
-                    ),
-                    const SizedBox(width: 10),
-                    _QuickActionTile(
-                      title: 'bKash',
-                      subtitle: 'Wallet entries',
-                      icon: Icons.account_balance_wallet_rounded,
-                      color: const Color(0xFF0EA5E9),
-                      onTap: () => widget.onNavigate(3),
-                    ),
-                    const SizedBox(width: 10),
-                    _QuickActionTile(
-                      title: 'Customers',
-                      subtitle: 'View profiles',
-                      icon: Icons.people_rounded,
-                      color: const Color(0xFF60A5FA),
-                      onTap: () => widget.onNavigate(5),
-                    ),
-                  ],
-                ),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final totalWidth = constraints.maxWidth;
+                  final crossCount = totalWidth >= 600
+                      ? 5
+                      : totalWidth >= 380
+                      ? 3
+                      : 2;
+                  final tileWidth =
+                      (totalWidth - (crossCount - 1) * 10) / crossCount;
+                  return Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      SizedBox(
+                        width: tileWidth,
+                        child: _QuickActionTile(
+                          title: 'New Bill',
+                          subtitle: 'Sell products',
+                          icon: Icons.point_of_sale_rounded,
+                          color: const Color(0xFF2563EB),
+                          onTap: () => widget.onNavigate(1),
+                        ),
+                      ),
+                      SizedBox(
+                        width: tileWidth,
+                        child: _QuickActionTile(
+                          title: 'Stock In',
+                          subtitle: 'Add inventory',
+                          icon: Icons.add_business_rounded,
+                          color: scheme.primary,
+                          onTap: () => widget.onNavigate(2),
+                        ),
+                      ),
+                      SizedBox(
+                        width: tileWidth,
+                        child: _QuickActionTile(
+                          title: 'Reports',
+                          subtitle: 'Business overview',
+                          icon: Icons.query_stats_rounded,
+                          color: scheme.tertiary,
+                          onTap: () => widget.onNavigate(4),
+                        ),
+                      ),
+                      SizedBox(
+                        width: tileWidth,
+                        child: _QuickActionTile(
+                          title: 'bKash',
+                          subtitle: 'Wallet entries',
+                          icon: Icons.account_balance_wallet_rounded,
+                          color: const Color(0xFF0EA5E9),
+                          onTap: () => widget.onNavigate(3),
+                        ),
+                      ),
+                      SizedBox(
+                        width: tileWidth,
+                        child: _QuickActionTile(
+                          title: 'Customers',
+                          subtitle: 'View profiles',
+                          icon: Icons.people_rounded,
+                          color: const Color(0xFF60A5FA),
+                          onTap: () => widget.onNavigate(5),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
 
               const SizedBox(height: 22),
@@ -2277,9 +2321,12 @@ class _SellTabState extends State<_SellTab> {
 
     Widget buildProductPane() {
       return filteredProducts.isEmpty
-          ? const Center(child: Text('No in-stock products found.'))
+          ? const _EmptyStateCard(
+              title: 'No products in stock',
+              message: 'Add products in the Stock tab to start billing.',
+            )
           : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
               itemCount: filteredProducts.length,
               itemBuilder: (context, index) {
                 final product = filteredProducts[index];
@@ -2292,8 +2339,11 @@ class _SellTabState extends State<_SellTab> {
                 final quantityInCart = inCart.isEmpty
                     ? 0
                     : inCart.first.quantity;
+                final scheme = Theme.of(context).colorScheme;
+                final inCartAccent = quantityInCart > 0;
 
-                return Card(
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
                   child: Focus(
                     onKeyEvent: (node, event) {
                       if (event is KeyDownEvent &&
@@ -2303,75 +2353,158 @@ class _SellTabState extends State<_SellTab> {
                       }
                       return KeyEventResult.ignored;
                     },
-                    child: ListTile(
-                      title: Row(
-                        children: [
-                          Expanded(child: Text(product.name)),
-                          if (hasDgdaData)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(
-                                'DGDA',
-                                style: Theme.of(context).textTheme.labelSmall
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onPrimaryContainer,
-                                    ),
-                              ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () =>
+                            _addProductToCart(product, quantityToAdd: 1),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: inCartAccent
+                                ? scheme.primaryContainer.withValues(alpha: 0.18)
+                                : scheme.surface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: inCartAccent
+                                  ? scheme.primary.withValues(alpha: 0.35)
+                                  : scheme.outlineVariant.withValues(alpha: 0.5),
                             ),
-                        ],
-                      ),
-                      subtitle: Text(
-                        '${_categoryLabel(product.category)} • ${_money(product.sellPrice)} • Stock ${_stockDisplay(product)}',
-                      ),
-                      trailing: supportsPiecePack
-                          ? Wrap(
-                              spacing: 8,
-                              children: [
-                                OutlinedButton(
-                                  onPressed: () => _addProductToCart(
-                                    product,
-                                    quantityToAdd: product.unitsPerPack,
-                                  ),
-                                  child: const Text('Pack'),
-                                ),
-                                FilledButton(
-                                  onPressed: () => _addProductToCart(
-                                    product,
-                                    quantityToAdd: 1,
-                                  ),
-                                  child: Text(
-                                    quantityInCart == 0
-                                        ? 'Piece'
-                                        : _cartQuantityLabel(
-                                            product,
-                                            quantityInCart,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 11,
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            product.name,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleSmall
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w700,
+                                                  color: inCartAccent
+                                                      ? scheme.primary
+                                                      : null,
+                                                ),
                                           ),
-                                  ),
+                                        ),
+                                        if (hasDgdaData)
+                                          Container(
+                                            margin: const EdgeInsets.only(
+                                              left: 6,
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 7,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: scheme.primaryContainer,
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
+                                            ),
+                                            child: Text(
+                                              'DGDA',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .labelSmall
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.w700,
+                                                    color:
+                                                        scheme.onPrimaryContainer,
+                                                  ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      '${_categoryLabel(product.category)} · ${_money(product.sellPrice)} · Stock ${_stockDisplay(product)}',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: scheme.onSurfaceVariant,
+                                          ),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            )
-                          : FilledButton.icon(
-                              onPressed: () =>
-                                  _addProductToCart(product, quantityToAdd: 1),
-                              icon: const Icon(Icons.add),
-                              label: Text(
-                                quantityInCart == 0
-                                    ? 'Add'
-                                    : 'x$quantityInCart',
                               ),
-                            ),
+                              const SizedBox(width: 10),
+                              supportsPiecePack
+                                  ? Wrap(
+                                      spacing: 6,
+                                      children: [
+                                        OutlinedButton(
+                                          style: OutlinedButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                            ),
+                                          ),
+                                          onPressed: () => _addProductToCart(
+                                            product,
+                                            quantityToAdd: product.unitsPerPack,
+                                          ),
+                                          child: const Text('Pack'),
+                                        ),
+                                        FilledButton(
+                                          style: FilledButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                            ),
+                                          ),
+                                          onPressed: () => _addProductToCart(
+                                            product,
+                                            quantityToAdd: 1,
+                                          ),
+                                          child: Text(
+                                            quantityInCart == 0
+                                                ? 'Piece'
+                                                : _cartQuantityLabel(
+                                                    product,
+                                                    quantityInCart,
+                                                  ),
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  : FilledButton.icon(
+                                      style: FilledButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                        ),
+                                        backgroundColor: inCartAccent
+                                            ? scheme.primary
+                                            : null,
+                                      ),
+                                      onPressed: () => _addProductToCart(
+                                        product,
+                                        quantityToAdd: 1,
+                                      ),
+                                      icon: Icon(
+                                        quantityInCart == 0
+                                            ? Icons.add
+                                            : Icons.shopping_cart_rounded,
+                                        size: 16,
+                                      ),
+                                      label: Text(
+                                        quantityInCart == 0
+                                            ? 'Add'
+                                            : 'x$quantityInCart',
+                                      ),
+                                    ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 );
@@ -2380,25 +2513,73 @@ class _SellTabState extends State<_SellTab> {
     }
 
     Widget buildCartPane() {
+      final scheme = Theme.of(context).colorScheme;
       return Container(
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerLowest,
+          color: scheme.surfaceContainerLowest,
           border: Border(
-            left: BorderSide(
-              color: Theme.of(context).colorScheme.outlineVariant,
-            ),
+            left: BorderSide(color: scheme.outlineVariant),
           ),
         ),
         child: Column(
           children: [
-            ListTile(
-              title: const Text('Current Bill'),
-              subtitle: Text('${_cart.length} line item(s)'),
+            // ── Cart header ──
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: scheme.surface,
+                border: Border(
+                  bottom: BorderSide(
+                    color: scheme.outlineVariant.withValues(alpha: 0.5),
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: scheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.receipt_long,
+                      size: 16,
+                      color: scheme.onPrimaryContainer,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Current Bill',
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        Text(
+                          '${_cart.length} item${_cart.length == 1 ? '' : 's'}',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
             Expanded(
               child: _cart.isEmpty
-                  ? const Center(child: Text('Add products to start a bill.'))
+                  ? const _EmptyStateCard(
+                      title: 'Cart is empty',
+                      message: 'Tap a product to add it to the bill.',
+                    )
                   : ListView.builder(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
                       itemCount: _cart.length,
                       itemBuilder: (context, index) {
                         final item = _cart[index];
@@ -2410,126 +2591,177 @@ class _SellTabState extends State<_SellTab> {
                           if ((item.product.dgdaGenericName ?? '')
                               .trim()
                               .isNotEmpty)
-                            'Generic: ${item.product.dgdaGenericName}',
-                          if ((item.product.dgdaDosageForm ?? '')
-                              .trim()
-                              .isNotEmpty)
-                            'Form: ${item.product.dgdaDosageForm}',
+                            item.product.dgdaGenericName!,
                           if ((item.product.dgdaStrength ?? '')
                               .trim()
                               .isNotEmpty)
-                            'Strength: ${item.product.dgdaStrength}',
+                            item.product.dgdaStrength!,
                         ];
 
-                        final subtitleBuffer = StringBuffer(
-                          '${supportsPiecePack ? _cartQuantityLabel(item.product, item.quantity) : item.quantity} x ${_money(item.unitPrice)} = ${_money(item.total)}',
-                        );
-                        if (dgdaSummary.isNotEmpty) {
-                          subtitleBuffer.write('\n${dgdaSummary.join(' • ')}');
-                        }
-
-                        return ListTile(
-                          title: Text(item.product.name),
-                          subtitle: Text(subtitleBuffer.toString()),
-                          isThreeLine: dgdaSummary.isNotEmpty,
-                          leading: _QuantityStepper(
-                            quantity: item.quantity,
-                            onDecrease: () => _changeCartQuantity(index, -1),
-                            onIncrease: () => _changeCartQuantity(index, 1),
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (supportsPiecePack)
-                                IconButton(
-                                  onPressed: () {
-                                    final removed = _changeCartQuantity(
-                                      index,
-                                      -item.product.unitsPerPack,
-                                    );
-                                    if (removed && mounted) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            '${item.product.name} removed from bill.',
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: scheme.surface,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: scheme.outlineVariant.withValues(
+                                  alpha: 0.4,
+                                ),
+                              ),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        item.product.name,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                      ),
+                                    ),
+                                    Text(
+                                      _money(item.total),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w800,
+                                            color: scheme.primary,
                                           ),
-                                          duration: const Duration(seconds: 1),
+                                    ),
+                                  ],
+                                ),
+                                if (dgdaSummary.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    dgdaSummary.join(' · '),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          color: scheme.onSurfaceVariant,
                                         ),
-                                      );
-                                    }
-                                  },
-                                  tooltip: 'Pack -',
-                                  icon: const Icon(
-                                    Icons.indeterminate_check_box_outlined,
-                                  ),
-                                ),
-                              if (supportsPiecePack)
-                                IconButton(
-                                  onPressed:
-                                      item.quantity +
-                                              item.product.unitsPerPack <=
-                                          item.product.stockQty
-                                      ? () => _changeCartQuantity(
-                                          index,
-                                          item.product.unitsPerPack,
-                                        )
-                                      : null,
-                                  tooltip: 'Pack +',
-                                  icon: const Icon(Icons.add_box_outlined),
-                                ),
-                              if (hasDgdaData)
-                                IconButton(
-                                  onPressed: () => _showDgdaDataDialog(
-                                    title: item.product.name,
-                                    data: item.product.dgdaData,
-                                  ),
-                                  tooltip: 'DGDA details',
-                                  icon: const Icon(Icons.info_outline),
-                                ),
-                              PopupMenuButton<String>(
-                                onSelected: (value) {
-                                  if (value == 'price') {
-                                    _editCartPrice(index);
-                                  }
-                                  if (value == 'remove') {
-                                    setState(() {
-                                      _cart.removeAt(index);
-                                    });
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            '${item.product.name} removed from bill.',
-                                          ),
-                                          duration: const Duration(seconds: 1),
-                                        ),
-                                      );
-                                    }
-                                  }
-                                },
-                                itemBuilder: (context) => const [
-                                  PopupMenuItem(
-                                    value: 'price',
-                                    child: Text('Edit Price'),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'remove',
-                                    child: Text('Remove'),
                                   ),
                                 ],
-                              ),
-                            ],
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    _QuantityStepper(
+                                      quantity: item.quantity,
+                                      onDecrease: () =>
+                                          _changeCartQuantity(index, -1),
+                                      onIncrease: () =>
+                                          _changeCartQuantity(index, 1),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '× ${_money(item.unitPrice)}',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: scheme.onSurfaceVariant,
+                                          ),
+                                    ),
+                                    const Spacer(),
+                                    if (supportsPiecePack)
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        onPressed: () {
+                                          _changeCartQuantity(
+                                            index,
+                                            -item.product.unitsPerPack,
+                                          );
+                                        },
+                                        tooltip: 'Pack -',
+                                        icon: const Icon(
+                                          Icons.indeterminate_check_box_outlined,
+                                          size: 18,
+                                        ),
+                                      ),
+                                    if (supportsPiecePack)
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        onPressed: item.quantity +
+                                                    item.product.unitsPerPack <=
+                                                item.product.stockQty
+                                            ? () => _changeCartQuantity(
+                                                  index,
+                                                  item.product.unitsPerPack,
+                                                )
+                                            : null,
+                                        tooltip: 'Pack +',
+                                        icon: const Icon(
+                                          Icons.add_box_outlined,
+                                          size: 18,
+                                        ),
+                                      ),
+                                    if (hasDgdaData)
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        onPressed: () => _showDgdaDataDialog(
+                                          title: item.product.name,
+                                          data: item.product.dgdaData,
+                                        ),
+                                        tooltip: 'DGDA details',
+                                        icon: const Icon(
+                                          Icons.info_outline,
+                                          size: 18,
+                                        ),
+                                      ),
+                                    PopupMenuButton<String>(
+                                      onSelected: (value) {
+                                        if (value == 'price') {
+                                          _editCartPrice(index);
+                                        }
+                                        if (value == 'remove') {
+                                          setState(() {
+                                            _cart.removeAt(index);
+                                          });
+                                        }
+                                      },
+                                      itemBuilder: (context) => const [
+                                        PopupMenuItem(
+                                          value: 'price',
+                                          child: Text('Edit Price'),
+                                        ),
+                                        PopupMenuItem(
+                                          value: 'remove',
+                                          child: Text('Remove'),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         );
                       },
                     ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(16),
+            // ── Bill footer ──
+            Container(
+              decoration: BoxDecoration(
+                color: scheme.surface,
+                border: Border(
+                  top: BorderSide(
+                    color: scheme.outlineVariant.withValues(alpha: 0.5),
+                  ),
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -2537,25 +2769,34 @@ class _SellTabState extends State<_SellTab> {
                     controller: _noteController,
                     decoration: const InputDecoration(
                       labelText: 'Bill Note (optional)',
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
-                      const Text(
+                      Text(
                         'Total',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const Spacer(),
                       Text(
                         _money(_grandTotal),
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w800,
+                          color: scheme.primary,
+                          letterSpacing: -0.4,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
                       Expanded(
@@ -2573,9 +2814,10 @@ class _SellTabState extends State<_SellTab> {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
+                        flex: 2,
                         child: FilledButton.icon(
                           onPressed: _cart.isEmpty ? null : _recordSaleCart,
-                          icon: const Icon(Icons.receipt_long),
+                          icon: const Icon(Icons.receipt_long, size: 18),
                           label: const Text('Record Bill'),
                         ),
                       ),
@@ -2646,12 +2888,12 @@ class _SellTabState extends State<_SellTab> {
 
               return Column(
                 children: [
-                  Expanded(flex: 6, child: buildProductPane()),
+                  Expanded(flex: 5, child: buildProductPane()),
                   Divider(
                     height: 1,
                     color: Theme.of(context).colorScheme.outlineVariant,
                   ),
-                  Expanded(flex: 5, child: buildCartPane()),
+                  Expanded(flex: 6, child: buildCartPane()),
                 ],
               );
             },
@@ -3613,9 +3855,12 @@ class _InventoryTabState extends State<_InventoryTab> {
 
     Widget productsPane() {
       return filteredProducts.isEmpty
-          ? const Center(child: Text('No products found.'))
+          ? const _EmptyStateCard(
+              title: 'No products found',
+              message: 'Add your first product with the button above.',
+            )
           : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
               itemCount: filteredProducts.length,
               itemBuilder: (context, index) {
                 final product = filteredProducts[index];
@@ -3630,121 +3875,224 @@ class _InventoryTabState extends State<_InventoryTab> {
                     ? const Color(0xFF1D4ED8)
                     : product.stockQty <= _lowStockThreshold
                     ? const Color(0xFF38BDF8)
-                    : const Color(0xFF60A5FA);
+                    : const Color(0xFF16A34A);
+                final scheme = Theme.of(context).colorScheme;
 
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Card(
-                    child: Focus(
-                      onKeyEvent: (node, event) {
-                        if (event is KeyDownEvent &&
-                            event.logicalKey == LogicalKeyboardKey.enter) {
-                          _showStockInDialog(product);
-                          return KeyEventResult.handled;
-                        }
-                        return KeyEventResult.ignored;
-                      },
-                      child: ListTile(
-                        minLeadingWidth: 62,
-                        title: Row(
-                          children: [
-                            Expanded(child: Text(product.name)),
-                            if (hasDgdaData)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.primaryContainer,
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: Text(
-                                  'DGDA',
-                                  style: Theme.of(context).textTheme.labelSmall
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w700,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onPrimaryContainer,
+                  child: Focus(
+                    onKeyEvent: (node, event) {
+                      if (event is KeyDownEvent &&
+                          event.logicalKey == LogicalKeyboardKey.enter) {
+                        _showStockInDialog(product);
+                        return KeyEventResult.handled;
+                      }
+                      return KeyEventResult.ignored;
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: scheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: scheme.outlineVariant.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 11,
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // ── Stock badge ──
+                          hasPackPiece
+                              ? _MedicineCountBadge(
+                                  stockQty: product.stockQty,
+                                  unitsPerPack: product.unitsPerPack,
+                                  tone: stockColor,
+                                )
+                              : Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: stockColor.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      _stockShortDisplay(product),
+                                      style: TextStyle(
+                                        color: stockColor,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 13,
                                       ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        subtitle: Text(
-                          '${_categoryLabel(product.category)} • Buy ${_money(product.buyPrice)} • Sell ${_money(product.sellPrice)} • Stock ${_stockDisplay(product)}${product.dgdaGenericName == null || product.dgdaGenericName!.isEmpty ? '' : '\nGeneric: ${product.dgdaGenericName}'}${product.dgdaManufacturer == null || product.dgdaManufacturer!.isEmpty ? '' : '\nManufacturer: ${product.dgdaManufacturer}'}',
-                        ),
-                        isThreeLine: product.dgdaGenericName != null,
-                        leading: hasPackPiece
-                            ? _MedicineCountBadge(
-                                stockQty: product.stockQty,
-                                unitsPerPack: product.unitsPerPack,
-                                tone: stockColor,
-                              )
-                            : CircleAvatar(
-                                backgroundColor: stockColor.withValues(
-                                  alpha: 0.15,
-                                ),
-                                child: Text(
-                                  _stockShortDisplay(product),
-                                  style: TextStyle(
-                                    color: stockColor,
-                                    fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
-                              ),
-                        trailing: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 230),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (hasDgdaData)
-                                IconButton(
-                                  tooltip: 'DGDA details',
-                                  onPressed: () => _showDgdaDataDialog(
-                                    title: product.name,
-                                    data: product.dgdaData,
-                                  ),
-                                  icon: const Icon(Icons.info_outline),
+                          const SizedBox(width: 10),
+                          // ── Product info + actions (all inside Expanded) ──
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Name row with DGDA pill
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        product.name,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleSmall
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (hasDgdaData) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 7,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: scheme.primaryContainer,
+                                          borderRadius:
+                                              BorderRadius.circular(999),
+                                        ),
+                                        child: Text(
+                                          'DGDA',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .labelSmall
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w700,
+                                                color:
+                                                    scheme.onPrimaryContainer,
+                                              ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
-                              TextButton.icon(
-                                onPressed: () => _showStockInDialog(product),
-                                icon: const Icon(Icons.add_box_outlined),
-                                label: const Text('Stock In'),
-                              ),
-                              PopupMenuButton<String>(
-                                onSelected: (value) {
-                                  if (value == 'edit') {
-                                    _showProductDialog(product: product);
-                                  }
-                                  if (value == 'adjust') {
-                                    _showAdjustmentDialog(product);
-                                  }
-                                  if (value == 'delete') {
-                                    _deleteProduct(product);
-                                  }
-                                },
-                                itemBuilder: (context) => const [
-                                  PopupMenuItem(
-                                    value: 'edit',
-                                    child: Text('Edit'),
+                                const SizedBox(height: 4),
+                                // Category · Buy · Sell chips
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 2,
+                                  children: [
+                                    Text(
+                                      _categoryLabel(product.category),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: scheme.onSurfaceVariant,
+                                          ),
+                                    ),
+                                    Text(
+                                      'Buy ${_money(product.buyPrice)}',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: scheme.onSurfaceVariant,
+                                          ),
+                                    ),
+                                    Text(
+                                      'Sell ${_money(product.sellPrice)}',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: scheme.primary,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                                if ((product.dgdaGenericName ?? '').isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Text(
+                                      '${product.dgdaGenericName}${(product.dgdaManufacturer ?? '').isNotEmpty ? ' · ${product.dgdaManufacturer}' : ''}',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: scheme.onSurfaceVariant,
+                                          ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                  PopupMenuItem(
-                                    value: 'adjust',
-                                    child: Text('Adjust Stock'),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'delete',
-                                    child: Text('Delete'),
-                                  ),
-                                ],
-                              ),
-                            ],
+                                // ── Actions row ──
+                                const SizedBox(height: 6),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    if (hasDgdaData)
+                                      IconButton(
+                                        tooltip: 'DGDA details',
+                                        visualDensity: VisualDensity.compact,
+                                        onPressed: () => _showDgdaDataDialog(
+                                          title: product.name,
+                                          data: product.dgdaData,
+                                        ),
+                                        icon: const Icon(
+                                          Icons.info_outline,
+                                          size: 18,
+                                        ),
+                                      ),
+                                    FilledButton.tonal(
+                                      style: FilledButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                        ),
+                                        minimumSize: const Size(0, 32),
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                      onPressed: () =>
+                                          _showStockInDialog(product),
+                                      child: const Text('Stock In'),
+                                    ),
+                                    PopupMenuButton<String>(
+                                      onSelected: (value) {
+                                        if (value == 'edit') {
+                                          _showProductDialog(product: product);
+                                        }
+                                        if (value == 'adjust') {
+                                          _showAdjustmentDialog(product);
+                                        }
+                                        if (value == 'delete') {
+                                          _deleteProduct(product);
+                                        }
+                                      },
+                                      itemBuilder: (context) => const [
+                                        PopupMenuItem(
+                                          value: 'edit',
+                                          child: Text('Edit'),
+                                        ),
+                                        PopupMenuItem(
+                                          value: 'adjust',
+                                          child: Text('Adjust Stock'),
+                                        ),
+                                        PopupMenuItem(
+                                          value: 'delete',
+                                          child: Text('Delete'),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ),
                   ),
@@ -3754,18 +4102,243 @@ class _InventoryTabState extends State<_InventoryTab> {
     }
 
     Widget recordsPane() {
+      final scheme = Theme.of(context).colorScheme;
+
+      Widget stockInCard(int index) {
+        final purchase = stockInRecords[index];
+        final product = productsById[purchase.productId];
+        final title = product?.name ?? purchase.productId;
+        final hasPackPiece =
+            product != null &&
+            product.trackInPieces &&
+            product.unitsPerPack > 1;
+        final quantityLabel = product == null
+            ? '${purchase.quantity} units'
+            : _quantityDisplay(product, purchase.quantity);
+        const stripColor = Color(0xFF16A34A);
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Container(
+            decoration: BoxDecoration(
+              color: scheme.surface,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: scheme.outlineVariant.withValues(alpha: 0.45),
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(width: 4, color: stripColor),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        child: Row(
+                          children: [
+                            if (hasPackPiece) ...[
+                              _MedicineCountBadge(
+                                stockQty: purchase.quantity,
+                                unitsPerPack: product.unitsPerPack,
+                                tone: stripColor,
+                                compact: true,
+                              ),
+                              const SizedBox(width: 10),
+                            ],
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    title,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleSmall
+                                        ?.copyWith(fontWeight: FontWeight.w700),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Wrap(
+                                    spacing: 8,
+                                    children: [
+                                      Text(
+                                        _dateTimeLabel(purchase.createdAt),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: scheme.onSurfaceVariant,
+                                            ),
+                                      ),
+                                      Text(
+                                        'Qty $quantityLabel',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: stripColor,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                      Text(
+                                        'Unit ${_money(purchase.unitPrice)}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: scheme.onSurfaceVariant,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _money(purchase.total),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: stripColor,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+
+      Widget adjustmentCard(int index) {
+        final adjustment = adjustmentRecords[index];
+        final product = productsById[adjustment.productId];
+        final title = product?.name ?? adjustment.productId;
+        final deltaLabel = _deltaQuantityDisplay(product, adjustment.deltaQty);
+        final isLoss = adjustment.deltaQty < 0;
+        final stripColor = isLoss ? scheme.error : const Color(0xFF16A34A);
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Container(
+            decoration: BoxDecoration(
+              color: scheme.surface,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: scheme.outlineVariant.withValues(alpha: 0.45),
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(width: 4, color: stripColor),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    title,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleSmall
+                                        ?.copyWith(fontWeight: FontWeight.w700),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Wrap(
+                                    spacing: 8,
+                                    children: [
+                                      Text(
+                                        _dateTimeLabel(adjustment.createdAt),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: scheme.onSurfaceVariant,
+                                            ),
+                                      ),
+                                      Text(
+                                        adjustment.reason,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: scheme.onSurfaceVariant,
+                                            ),
+                                      ),
+                                      Text(
+                                        'Qty $deltaLabel',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: stripColor,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (adjustment.lossValue > 0)
+                              Text(
+                                _money(adjustment.lossValue),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      color: stripColor,
+                                    ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+
       return Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Stock In Records',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              'Stock Records',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
@@ -3796,7 +4369,7 @@ class _InventoryTabState extends State<_InventoryTab> {
                 const SizedBox(width: 8),
                 OutlinedButton.icon(
                   onPressed: _pickStockInDate,
-                  icon: const Icon(Icons.calendar_today),
+                  icon: const Icon(Icons.calendar_today, size: 16),
                   label: Text(_stockInFilterLabel),
                 ),
               ],
@@ -3820,97 +4393,35 @@ class _InventoryTabState extends State<_InventoryTab> {
                 });
               },
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Expanded(
               child: _isLoadingStockInRecords
                   ? const Center(child: CircularProgressIndicator())
                   : _recordsView == 'stock_in'
                   ? (stockInRecords.isEmpty
-                        ? const Center(
-                            child: Text('No stock in records for this filter.'),
-                          )
-                        : ListView.separated(
-                            itemCount: stockInRecords.length,
-                            separatorBuilder: (_, _) =>
-                                const SizedBox(height: 4),
-                            itemBuilder: (context, index) {
-                              final purchase = stockInRecords[index];
-                              final product = productsById[purchase.productId];
-                              final title = product?.name ?? purchase.productId;
-                              final hasPackPiece =
-                                  product != null &&
-                                  product.trackInPieces &&
-                                  product.unitsPerPack > 1;
-                              final quantityLabel = product == null
-                                  ? '${purchase.quantity} units'
-                                  : _quantityDisplay(
-                                      product,
-                                      purchase.quantity,
-                                    );
-
-                              return Card(
-                                child: ListTile(
-                                  minLeadingWidth: 62,
-                                  leading: hasPackPiece
-                                      ? _MedicineCountBadge(
-                                          stockQty: purchase.quantity,
-                                          unitsPerPack: product.unitsPerPack,
-                                          tone: Theme.of(
-                                            context,
-                                          ).colorScheme.primary,
-                                          compact: true,
-                                        )
-                                      : null,
-                                  title: Text(title),
-                                  subtitle: Text(
-                                    '${_dateTimeLabel(purchase.createdAt)} • Qty $quantityLabel • Unit ${_money(purchase.unitPrice)}',
-                                  ),
-                                  trailing: Text(
-                                    _money(purchase.total),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ))
-                  : (adjustmentRecords.isEmpty
-                        ? const Center(
-                            child: Text(
-                              'No adjustment records for this filter.',
+                        ? const SingleChildScrollView(
+                            child: _EmptyStateCard(
+                              title: 'No stock-in records',
+                              message: 'No records match the selected filter.',
                             ),
                           )
-                        : ListView.separated(
+                        : ListView.builder(
+                            itemCount: stockInRecords.length,
+                            itemBuilder: (context, index) =>
+                                stockInCard(index),
+                          ))
+                  : (adjustmentRecords.isEmpty
+                        ? const SingleChildScrollView(
+                            child: _EmptyStateCard(
+                              title: 'No adjustments',
+                              message:
+                                  'No adjustments match the selected filter.',
+                            ),
+                          )
+                        : ListView.builder(
                             itemCount: adjustmentRecords.length,
-                            separatorBuilder: (_, _) =>
-                                const SizedBox(height: 4),
-                            itemBuilder: (context, index) {
-                              final adjustment = adjustmentRecords[index];
-                              final product =
-                                  productsById[adjustment.productId];
-                              final title =
-                                  product?.name ?? adjustment.productId;
-                              final deltaLabel = _deltaQuantityDisplay(
-                                product,
-                                adjustment.deltaQty,
-                              );
-
-                              return Card(
-                                child: ListTile(
-                                  title: Text(title),
-                                  subtitle: Text(
-                                    '${_dateTimeLabel(adjustment.createdAt)} • ${adjustment.reason} • Qty $deltaLabel',
-                                  ),
-                                  trailing: Text(
-                                    _money(adjustment.lossValue),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
+                            itemBuilder: (context, index) =>
+                                adjustmentCard(index),
                           )),
             ),
           ],
@@ -6000,28 +6511,127 @@ class _ReportsTabState extends State<_ReportsTab> {
               const SizedBox(height: 20),
               Text(
                 'Recent Loss Entries',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               if (widget.controller.adjustments.isEmpty)
-                const Text('No inventory loss adjustments in this period.')
+                const _EmptyStateCard(
+                  title: 'No loss entries',
+                  message: 'No inventory adjustments recorded in this period.',
+                )
               else
-                ...widget.controller.adjustments.map(
-                  (adjustment) => Card(
-                    child: ListTile(
-                      title: Text(
-                        productNames[adjustment.productId] ??
-                            adjustment.productId,
+                ...widget.controller.adjustments.map((adjustment) {
+                  final scheme = Theme.of(context).colorScheme;
+                  final isLoss = adjustment.deltaQty < 0;
+                  final stripColor =
+                      isLoss ? scheme.error : const Color(0xFF16A34A);
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: scheme.surface,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: scheme.outlineVariant.withValues(alpha: 0.45),
+                        ),
                       ),
-                      subtitle: Text(
-                        '${adjustment.reason} • Qty ${adjustment.deltaQty} • ${_dateTimeLabel(adjustment.createdAt)}',
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Container(width: 4, color: stripColor),
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 10,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              productNames[adjustment.productId] ??
+                                                  adjustment.productId,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .titleSmall
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                            ),
+                                            const SizedBox(height: 3),
+                                            Wrap(
+                                              spacing: 8,
+                                              children: [
+                                                Text(
+                                                  adjustment.reason,
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .bodySmall
+                                                      ?.copyWith(
+                                                        color: scheme
+                                                            .onSurfaceVariant,
+                                                      ),
+                                                ),
+                                                Text(
+                                                  'Qty ${adjustment.deltaQty}',
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .bodySmall
+                                                      ?.copyWith(
+                                                        color: stripColor,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                ),
+                                                Text(
+                                                  _dateTimeLabel(
+                                                    adjustment.createdAt,
+                                                  ),
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .bodySmall
+                                                      ?.copyWith(
+                                                        color: scheme
+                                                            .onSurfaceVariant,
+                                                      ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (adjustment.lossValue > 0)
+                                        Text(
+                                          _money(adjustment.lossValue),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleSmall
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w800,
+                                                color: stripColor,
+                                              ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      trailing: Text(_money(adjustment.lossValue)),
                     ),
-                  ),
-                ),
+                  );
+                }),
             ],
           ),
         );
@@ -6270,60 +6880,80 @@ class _SummaryCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return _HoverLift(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: scheme.outlineVariant.withValues(alpha: 0.5),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: scheme.shadow.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(11),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(width: 4, color: color),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 13,
                     ),
-                    child: Icon(icon, color: color, size: 18),
-                  ),
-                  const Spacer(),
-                  Container(
-                    width: 4,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.30),
-                      borderRadius: BorderRadius.circular(999),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(icon, color: color, size: 18),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              value,
+                              style: Theme.of(
+                                context,
+                              ).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.4,
+                                color: scheme.onSurface,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              title,
+                              style: Theme.of(
+                                context,
+                              ).textTheme.bodySmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    value,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.4,
-                      color: scheme.onSurface,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -6429,47 +7059,44 @@ class _QuickActionTile extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return _HoverLift(
-      child: SizedBox(
-        width: 152,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerLowest,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: color.withValues(alpha: 0.22)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(icon, color: color, size: 20),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: color.withValues(alpha: 0.22)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                  child: Icon(icon, color: color, size: 20),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -6501,49 +7128,69 @@ class _StockAlertTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surfaceContainerLowest,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.22)),
+          border: Border.all(color: color.withValues(alpha: 0.20)),
         ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 10,
-                  letterSpacing: 0.5,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(11),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(width: 4, color: color),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 11,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              color: color,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 10,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            product.name,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _stockShortDisplay(product),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: color,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                product.name,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              _stockShortDisplay(product),
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: color,
-                fontSize: 13,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -6610,17 +7257,18 @@ class _EmptyStateCard extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: scheme.primaryContainer.withValues(alpha: 0.4),
               shape: BoxShape.circle,
@@ -6628,17 +7276,17 @@ class _EmptyStateCard extends StatelessWidget {
             child: Icon(
               Icons.inbox_rounded,
               color: scheme.primary.withValues(alpha: 0.7),
-              size: 28,
+              size: 24,
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           Text(
             title,
             style: Theme.of(
               context,
             ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             message,
             textAlign: TextAlign.center,

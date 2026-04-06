@@ -4,7 +4,6 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:encrypt/encrypt.dart' as enc;
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
@@ -116,7 +115,6 @@ class BackupService {
   /// Increment to 3 if the on-disk format changes incompatibly.
   static const int _formatVersion = 2;
   static const String _deviceIdKey = 'jarin_backup_device_id';
-  static const FlutterSecureStorage _storage = FlutterSecureStorage();
 
   // ── Encryption constants ───────────────────────────────────────────────────
 
@@ -168,12 +166,26 @@ class BackupService {
     'inventory_adjustments',
   ];
 
+  // Stored in SQLite auth_state table — no Keychain required, works on all
+  // platforms including sandboxed macOS without a signing certificate.
   Future<String> _getOrCreateDeviceId() async {
-    var id = await _storage.read(key: _deviceIdKey);
-    if (id == null) {
-      id = const Uuid().v4();
-      await _storage.write(key: _deviceIdKey, value: id);
+    final db = await AppDatabase.instance.database;
+    final rows = await db.query(
+      'auth_state',
+      columns: ['value'],
+      where: 'key = ?',
+      whereArgs: [_deviceIdKey],
+      limit: 1,
+    );
+    if (rows.isNotEmpty) {
+      return rows.first['value'] as String;
     }
+    final id = const Uuid().v4();
+    await db.insert(
+      'auth_state',
+      {'key': _deviceIdKey, 'value': id},
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
     return id;
   }
 
@@ -233,6 +245,11 @@ class BackupService {
       final salt = base64.decode(saltB64);
       final ivBytes = base64.decode(ivB64);
       final plaintext = _decrypt(cipherB64, salt, ivBytes);
+      // Preserve the raw decrypted JSON string for checksum verification.
+      // jsonEncode(jsonDecode(s)) is NOT guaranteed to equal s across platforms:
+      // Dart native encodes 1.0 as "1.0" but Dart-web (JS) encodes it as "1",
+      // so re-encoding after decoding would produce a different checksum on web.
+      payload['_rawDataJson'] = plaintext;
       payload['data'] = jsonDecode(plaintext) as Map<String, dynamic>;
     }
 
@@ -245,12 +262,34 @@ class BackupService {
   ///
   /// The returned [Uint8List] is ready to be written to a `.json` file.
   /// The file contains no plaintext business data.
+  ///
+  /// `auth_users` is included (inside the encrypted payload) so that
+  /// the account can be fully restored after a reinstall.  It is safe
+  /// to do so because the backup itself is AES-256-CBC encrypted.
   Future<Uint8List> createBackup() async {
     final db = await AppDatabase.instance.database;
     final Map<String, dynamic> data = {};
 
     for (final table in _exportOrder) {
       data[table] = await db.query(table);
+    }
+
+    // Include auth credentials so reinstalling on any device can restore
+    // the single master account without creating a new one.
+    final authRows = await db.query(
+      'auth_users',
+      columns: [
+        'id',
+        'email',
+        'password_hash',
+        'password_salt',
+        'created_at',
+        'updated_at',
+      ],
+    );
+    if (authRows.isNotEmpty) {
+      // Only ever one user in this app; take the first row.
+      data['auth_users'] = [authRows.first];
     }
 
     final dataJson = jsonEncode(data);
@@ -304,9 +343,16 @@ class BackupService {
 
       final storedChecksum = payload['checksum'] as String?;
       if (storedChecksum != null) {
-        final computed = sha256
-            .convert(utf8.encode(jsonEncode(data)))
-            .toString();
+        // Use the raw decrypted JSON string for checksum verification so that
+        // the hash is byte-for-byte identical to what was signed at export time,
+        // regardless of the platform running the import.  Re-encoding via
+        // jsonEncode(jsonDecode(...)) changes number formatting on Dart-web
+        // (JS drops the ".0" suffix from whole-number doubles), which would
+        // cause every Android-exported backup to fail the integrity check on web.
+        final rawForChecksum =
+            (payload['_rawDataJson'] as String?) ?? jsonEncode(data);
+        final computed =
+            sha256.convert(utf8.encode(rawForChecksum)).toString();
         if (computed != storedChecksum) {
           return ImportResult(
             success: false,
@@ -333,7 +379,9 @@ class BackupService {
     }
   }
 
-  /// Validates and fully restores a backup, replacing all existing business data.
+  /// Validates and fully restores a backup, replacing all existing business
+  /// data AND the user account so reinstalling on a new device works
+  /// seamlessly with the same credentials.
   Future<ImportResult> restoreBackup(Uint8List bytes) async {
     final validation = await validateBackup(bytes);
     if (!validation.success) return validation;
@@ -346,6 +394,7 @@ class BackupService {
       await db.execute('PRAGMA foreign_keys = OFF');
       try {
         await db.transaction((txn) async {
+          // ── Restore business data ────────────────────────────────────────
           for (final table in _deleteOrder) {
             await txn.delete(table);
           }
@@ -358,6 +407,31 @@ class BackupService {
                 conflictAlgorithm: ConflictAlgorithm.replace,
               );
             }
+          }
+
+          // ── Restore auth user (single-user enforcement) ──────────────────
+          // Backups created after this update include an `auth_users` entry.
+          // Older backups without it are skipped here (auth unchanged).
+          final authRows = (data['auth_users'] as List<dynamic>?) ?? [];
+          if (authRows.isNotEmpty) {
+            // Replace the entire auth_users table with the single backup user.
+            await txn.delete('auth_users');
+            final userRow =
+                Map<String, dynamic>.from(authRows.first as Map);
+            await txn.insert(
+              'auth_users',
+              userRow,
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+
+            // Invalidate any active session so the user must log in again
+            // with the restored credentials (prevents auto-login with the
+            // previous device's stale session).
+            await txn.delete(
+              'auth_state',
+              where: 'key = ? OR key = ?',
+              whereArgs: ['auth.session.active', 'auth.session.remember_me'],
+            );
           }
         });
       } finally {

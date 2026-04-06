@@ -348,9 +348,9 @@ class AuthService {
       return;
     }
 
-    final email = await _legacyStorage.read(key: _emailKey);
-    final hash = await _legacyStorage.read(key: _hashKey);
-    final salt = await _legacyStorage.read(key: _saltKey);
+    final email = await _legacyStorage.read(key: _emailKey).catchError((_) => null);
+    final hash  = await _legacyStorage.read(key: _hashKey).catchError((_) => null);
+    final salt  = await _legacyStorage.read(key: _saltKey).catchError((_) => null);
     if (email == null || hash == null || salt == null) {
       _legacyMigrated = true;
       return;
@@ -375,7 +375,12 @@ class AuthService {
   }
 
   Future<void> _copyLegacyStateIfPresent(String key) async {
-    final value = await _legacyStorage.read(key: key);
+    final String? value;
+    try {
+      value = await _legacyStorage.read(key: key);
+    } catch (_) {
+      return; // Keychain unavailable on this platform/build
+    }
     if (value == null) {
       return;
     }
