@@ -593,6 +593,26 @@ class _AuthGateState extends ConsumerState<AuthGate> {
               icon: const Icon(Icons.login_outlined),
               label: const Text('Log in'),
             ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                const Expanded(child: Divider()),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    'or',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+                const Expanded(child: Divider()),
+              ],
+            ),
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              onPressed: auth.isBusy ? null : () => _restoreFromBackup(),
+              icon: const Icon(Icons.restore_outlined),
+              label: const Text('Restore from Backup'),
+            ),
           ],
         ),
       ),
