@@ -14,10 +14,9 @@ Future<void> saveBackupFile(String filename, Uint8List bytes) async {
     final dir = await getTemporaryDirectory();
     final file = File('${dir.path}/$filename');
     await file.writeAsBytes(bytes, flush: true);
-    await Share.shareXFiles(
-      [XFile(file.path, mimeType: 'application/json', name: filename)],
-      subject: filename,
-    );
+    await Share.shareXFiles([
+      XFile(file.path, mimeType: 'application/json', name: filename),
+    ], subject: filename);
   } else {
     // Desktop: native save-file dialog.
     final path = await FilePicker.platform.saveFile(

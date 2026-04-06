@@ -181,11 +181,10 @@ class BackupService {
       return rows.first['value'] as String;
     }
     final id = const Uuid().v4();
-    await db.insert(
-      'auth_state',
-      {'key': _deviceIdKey, 'value': id},
-      conflictAlgorithm: ConflictAlgorithm.ignore,
-    );
+    await db.insert('auth_state', {
+      'key': _deviceIdKey,
+      'value': id,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
     return id;
   }
 
@@ -351,8 +350,7 @@ class BackupService {
         // cause every Android-exported backup to fail the integrity check on web.
         final rawForChecksum =
             (payload['_rawDataJson'] as String?) ?? jsonEncode(data);
-        final computed =
-            sha256.convert(utf8.encode(rawForChecksum)).toString();
+        final computed = sha256.convert(utf8.encode(rawForChecksum)).toString();
         if (computed != storedChecksum) {
           return ImportResult(
             success: false,
@@ -416,8 +414,7 @@ class BackupService {
           if (authRows.isNotEmpty) {
             // Replace the entire auth_users table with the single backup user.
             await txn.delete('auth_users');
-            final userRow =
-                Map<String, dynamic>.from(authRows.first as Map);
+            final userRow = Map<String, dynamic>.from(authRows.first as Map);
             await txn.insert(
               'auth_users',
               userRow,

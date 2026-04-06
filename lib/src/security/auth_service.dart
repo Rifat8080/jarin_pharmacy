@@ -348,9 +348,15 @@ class AuthService {
       return;
     }
 
-    final email = await _legacyStorage.read(key: _emailKey).catchError((_) => null);
-    final hash  = await _legacyStorage.read(key: _hashKey).catchError((_) => null);
-    final salt  = await _legacyStorage.read(key: _saltKey).catchError((_) => null);
+    final email = await _legacyStorage
+        .read(key: _emailKey)
+        .catchError((_) => null);
+    final hash = await _legacyStorage
+        .read(key: _hashKey)
+        .catchError((_) => null);
+    final salt = await _legacyStorage
+        .read(key: _saltKey)
+        .catchError((_) => null);
     if (email == null || hash == null || salt == null) {
       _legacyMigrated = true;
       return;

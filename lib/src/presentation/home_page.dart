@@ -1464,11 +1464,7 @@ class _DashboardTabState extends State<_DashboardTab> {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF1D4ED8),
-                Color(0xFF2563EB),
-                Color(0xFF38BDF8),
-              ],
+              colors: [Color(0xFF1D4ED8), Color(0xFF2563EB), Color(0xFF38BDF8)],
             ),
           ),
           padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
@@ -2362,13 +2358,17 @@ class _SellTabState extends State<_SellTab> {
                         child: Container(
                           decoration: BoxDecoration(
                             color: inCartAccent
-                                ? scheme.primaryContainer.withValues(alpha: 0.18)
+                                ? scheme.primaryContainer.withValues(
+                                    alpha: 0.18,
+                                  )
                                 : scheme.surface,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: inCartAccent
                                   ? scheme.primary.withValues(alpha: 0.35)
-                                  : scheme.outlineVariant.withValues(alpha: 0.5),
+                                  : scheme.outlineVariant.withValues(
+                                      alpha: 0.5,
+                                    ),
                             ),
                           ),
                           padding: const EdgeInsets.symmetric(
@@ -2418,8 +2418,8 @@ class _SellTabState extends State<_SellTab> {
                                                   .labelSmall
                                                   ?.copyWith(
                                                     fontWeight: FontWeight.w700,
-                                                    color:
-                                                        scheme.onPrimaryContainer,
+                                                    color: scheme
+                                                        .onPrimaryContainer,
                                                   ),
                                             ),
                                           ),
@@ -2517,9 +2517,7 @@ class _SellTabState extends State<_SellTab> {
       return Container(
         decoration: BoxDecoration(
           color: scheme.surfaceContainerLowest,
-          border: Border(
-            left: BorderSide(color: scheme.outlineVariant),
-          ),
+          border: Border(left: BorderSide(color: scheme.outlineVariant)),
         ),
         child: Column(
           children: [
@@ -2646,9 +2644,7 @@ class _SellTabState extends State<_SellTab> {
                                   const SizedBox(height: 2),
                                   Text(
                                     dgdaSummary.join(' · '),
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
+                                    style: Theme.of(context).textTheme.bodySmall
                                         ?.copyWith(
                                           color: scheme.onSurfaceVariant,
                                         ),
@@ -2686,20 +2682,22 @@ class _SellTabState extends State<_SellTab> {
                                         },
                                         tooltip: 'Pack -',
                                         icon: const Icon(
-                                          Icons.indeterminate_check_box_outlined,
+                                          Icons
+                                              .indeterminate_check_box_outlined,
                                           size: 18,
                                         ),
                                       ),
                                     if (supportsPiecePack)
                                       IconButton(
                                         visualDensity: VisualDensity.compact,
-                                        onPressed: item.quantity +
+                                        onPressed:
+                                            item.quantity +
                                                     item.product.unitsPerPack <=
                                                 item.product.stockQty
                                             ? () => _changeCartQuantity(
-                                                  index,
-                                                  item.product.unitsPerPack,
-                                                )
+                                                index,
+                                                item.product.unitsPerPack,
+                                              )
                                             : null,
                                         tooltip: 'Pack +',
                                         icon: const Icon(
@@ -3960,8 +3958,9 @@ class _InventoryTabState extends State<_InventoryTab> {
                                         ),
                                         decoration: BoxDecoration(
                                           color: scheme.primaryContainer,
-                                          borderRadius:
-                                              BorderRadius.circular(999),
+                                          borderRadius: BorderRadius.circular(
+                                            999,
+                                          ),
                                         ),
                                         child: Text(
                                           'DGDA',
@@ -4202,9 +4201,7 @@ class _InventoryTabState extends State<_InventoryTab> {
                             const SizedBox(width: 8),
                             Text(
                               _money(purchase.total),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
+                              style: Theme.of(context).textTheme.titleSmall
                                   ?.copyWith(
                                     fontWeight: FontWeight.w800,
                                     color: stripColor,
@@ -4306,9 +4303,7 @@ class _InventoryTabState extends State<_InventoryTab> {
                             if (adjustment.lossValue > 0)
                               Text(
                                 _money(adjustment.lossValue),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleSmall
+                                style: Theme.of(context).textTheme.titleSmall
                                     ?.copyWith(
                                       fontWeight: FontWeight.w800,
                                       color: stripColor,
@@ -4333,10 +4328,9 @@ class _InventoryTabState extends State<_InventoryTab> {
           children: [
             Text(
               'Stock Records',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
             Row(
@@ -4407,8 +4401,7 @@ class _InventoryTabState extends State<_InventoryTab> {
                           )
                         : ListView.builder(
                             itemCount: stockInRecords.length,
-                            itemBuilder: (context, index) =>
-                                stockInCard(index),
+                            itemBuilder: (context, index) => stockInCard(index),
                           ))
                   : (adjustmentRecords.isEmpty
                         ? const SingleChildScrollView(
@@ -6511,10 +6504,9 @@ class _ReportsTabState extends State<_ReportsTab> {
               const SizedBox(height: 20),
               Text(
                 'Recent Loss Entries',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               if (widget.controller.adjustments.isEmpty)
@@ -6526,8 +6518,9 @@ class _ReportsTabState extends State<_ReportsTab> {
                 ...widget.controller.adjustments.map((adjustment) {
                   final scheme = Theme.of(context).colorScheme;
                   final isLoss = adjustment.deltaQty < 0;
-                  final stripColor =
-                      isLoss ? scheme.error : const Color(0xFF16A34A);
+                  final stripColor = isLoss
+                      ? scheme.error
+                      : const Color(0xFF16A34A);
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 6),
                     child: Container(
@@ -6559,7 +6552,8 @@ class _ReportsTabState extends State<_ReportsTab> {
                                               CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              productNames[adjustment.productId] ??
+                                              productNames[adjustment
+                                                      .productId] ??
                                                   adjustment.productId,
                                               style: Theme.of(context)
                                                   .textTheme
@@ -6926,25 +6920,23 @@ class _SummaryCard extends StatelessWidget {
                           children: [
                             Text(
                               value,
-                              style: Theme.of(
-                                context,
-                              ).textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.4,
-                                color: scheme.onSurface,
-                              ),
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.4,
+                                    color: scheme.onSurface,
+                                  ),
                               overflow: TextOverflow.ellipsis,
                               maxLines: 1,
                             ),
                             const SizedBox(height: 2),
                             Text(
                               title,
-                              style: Theme.of(
-                                context,
-                              ).textTheme.bodySmall?.copyWith(
-                                color: scheme.onSurfaceVariant,
-                                fontWeight: FontWeight.w500,
-                              ),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: scheme.onSurfaceVariant,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                             ),
                           ],
                         ),
@@ -7085,9 +7077,9 @@ class _QuickActionTile extends StatelessWidget {
                 const SizedBox(height: 10),
                 Text(
                   title,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 2),
                 Text(

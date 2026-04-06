@@ -474,8 +474,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
             ),
             const SizedBox(height: 14),
             OutlinedButton.icon(
-              onPressed:
-                  auth.isBusy ? null : () => _restoreFromBackup(),
+              onPressed: auth.isBusy ? null : () => _restoreFromBackup(),
               icon: const Icon(Icons.restore_outlined),
               label: const Text('Restore from Backup'),
             ),
